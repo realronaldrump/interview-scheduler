@@ -12,7 +12,8 @@ def solve_schedule(
     students: list[dict],
     interviewers: list[dict],
     num_slots: int = 13,
-    breaks_per_interviewer: int = 1,
+    breaks_min: int = 1,
+    breaks_max: int = 1,
     min_virtual_per_student: int = 1,
     seed: Optional[int] = None
 ) -> dict:
@@ -23,7 +24,8 @@ def solve_schedule(
         students: List of dicts with 'name' and 'target' (interview count)
         interviewers: List of dicts with 'name' and 'is_virtual' (bool)
         num_slots: Number of time slots
-        breaks_per_interviewer: Breaks each interviewer must take
+        breaks_min: Minimum breaks each interviewer must take
+        breaks_max: Maximum breaks each interviewer must take
         min_virtual_per_student: Minimum virtual interviews per student
         seed: Random seed for reproducibility (optional)
     
@@ -33,7 +35,8 @@ def solve_schedule(
     
     # Validate inputs
     num_interviewers = len(interviewers)
-    working_slots = num_slots - breaks_per_interviewer
+    # Capacity is based on minimum breaks (most interviews possible)
+    working_slots = num_slots - breaks_min
     total_capacity = num_interviewers * working_slots
     total_demand = sum(s['target'] for s in students)
     
@@ -74,9 +77,11 @@ def solve_schedule(
         for t in range(num_slots):
             breaks[i, t] = model.NewBoolVar(f'break_{i}_{t}')
     
-    # CONSTRAINT 1: Each interviewer has exactly breaks_per_interviewer breaks
+    # CONSTRAINT 1: Each interviewer has breaks within [min, max]
     for i in range(num_interviewers):
-        model.Add(sum(breaks[i, t] for t in range(num_slots)) == breaks_per_interviewer)
+        total_breaks = sum(breaks[i, t] for t in range(num_slots))
+        model.Add(total_breaks >= breaks_min)
+        model.Add(total_breaks <= breaks_max)
     
     # CONSTRAINT 2: If interviewer has break, they can't interview
     for i in range(num_interviewers):

@@ -84,7 +84,10 @@ def solve():
         })
     
     num_slots = int(data.get('num_slots', 13))
-    breaks_per_interviewer = int(data.get('breaks_per_interviewer', 1))
+    # Flexible breaks
+    breaks_min = int(data.get('breaks_min', 1))
+    breaks_max = int(data.get('breaks_max', breaks_min))
+    
     min_virtual = int(data.get('min_virtual_per_student', 1))
     auto_balance = data.get('auto_balance', False)
     seed = data.get('seed')
@@ -98,7 +101,8 @@ def solve():
     if auto_balance:
         # Calculate capacity
         num_interviewers = len(interviewers)
-        working_slots = num_slots - breaks_per_interviewer
+        # Use min breaks for max theoretical capacity
+        working_slots = num_slots - breaks_min
         total_capacity = num_interviewers * working_slots
         current_demand = sum(s['target'] for s in students)
         
@@ -134,7 +138,8 @@ def solve():
         students=students,
         interviewers=interviewers,
         num_slots=num_slots,
-        breaks_per_interviewer=breaks_per_interviewer,
+        breaks_min=breaks_min,
+        breaks_max=breaks_max,
         min_virtual_per_student=min_virtual,
         seed=seed
     )
@@ -157,11 +162,13 @@ def solve():
         inv_map = {i['name']: i for i in interviewers}
         
         for name, slots in inv_schedule.items():
-            # Find break slot (1-based)
-            break_slot = "None"
-            if "BREAK" in slots:
-                # Add 1 because slots are 0-indexed
-                break_slot = slots.index("BREAK") + 1
+            # Find all break slots (1-based)
+            break_indices = [i + 1 for i, s in enumerate(slots) if s == "BREAK"]
+            
+            if not break_indices:
+                break_display = "None"
+            else:
+                break_display = ", ".join(map(str, break_indices))
             
             inv_obj = inv_map.get(name)
             if inv_obj:
@@ -169,7 +176,7 @@ def solve():
                     'name': name,
                     'id': inv_obj['id'],
                     'is_virtual': inv_obj['is_virtual'],
-                    'break_slot': break_slot
+                    'break_slot': break_display
                 })
         
         # Sort by ID for display

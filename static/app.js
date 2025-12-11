@@ -11,6 +11,7 @@ let currentSchedule = null;
 let lastSeedUsed = null;
 let lastResult = null;
 let viewMode = 'name';
+let studentSortMode = 'added';
 
 // Initialize
 function initializeApp(defaultStudents, defaultPhysical, defaultVirtual) {
@@ -27,23 +28,71 @@ function initializeApp(defaultStudents, defaultPhysical, defaultVirtual) {
 }
 
 // Student Management
+function renderStudentItem(index, name, target) {
+    return `
+        <div class="student-item" data-index="${index}">
+            <input type="text" value="${escapeHtml(name)}" 
+                   onchange="updateStudentName(${index}, this.value)" placeholder="Student Name">
+            <input type="number" value="${target}" min="1" max="13"
+                   onchange="updateStudentTarget(${index}, this.value)" title="Number of interviews">
+            <button class="remove-btn" onclick="removeStudent(${index})" title="Remove student">×</button>
+        </div>
+    `;
+}
+
 function renderStudents() {
     const container = document.getElementById('student-list');
 
     if (students.length === 0) {
         container.innerHTML = '<div style="color: #666; padding: 10px; width: 100%; text-align: center; font-style: italic;">No students added yet. Click "+ Add Student" or "Paste List" to begin.</div>';
-    } else {
-        container.innerHTML = students.map((s, i) => `
-            <div class="student-item" data-index="${i}">
-                <input type="text" value="${escapeHtml(s.name)}" 
-                       onchange="updateStudentName(${i}, this.value)" placeholder="Student Name">
-                <input type="number" value="${s.target}" min="1" max="13"
-                       onchange="updateStudentTarget(${i}, this.value)" title="Number of interviews">
-                <button class="remove-btn" onclick="removeStudent(${i})" title="Remove student">×</button>
-            </div>
-        `).join('');
+        container.className = 'student-list';
+        return;
     }
+
+    if (studentSortMode === 'count') {
+        const groups = {};
+        students.forEach((s, i) => {
+            const t = s.target;
+            if (!groups[t]) groups[t] = [];
+            groups[t].push({ ...s, originalIndex: i });
+        });
+
+        const sortedTargets = Object.keys(groups).map(Number).sort((a, b) => b - a);
+
+        let html = '';
+        sortedTargets.forEach(target => {
+            const groupStudents = groups[target];
+            html += `
+                <div class="student-group">
+                    <div class="group-header">
+                        <span class="header-title">${target} Interviews</span>
+                        <span class="count-badge">${groupStudents.length}</span>
+                    </div>
+                    <div class="group-content">
+                        ${groupStudents.map(s => renderStudentItem(s.originalIndex, s.name, s.target)).join('')}
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+        container.className = 'student-list grouped';
+    } else {
+        container.innerHTML = students.map((s, i) => renderStudentItem(i, s.name, s.target)).join('');
+        container.className = 'student-list';
+    }
+
     updateStats();
+}
+
+function updateStudentSort() {
+    const radios = document.getElementsByName('student-sort');
+    for (const radio of radios) {
+        if (radio.checked) {
+            studentSortMode = radio.value;
+            break;
+        }
+    }
+    renderStudents();
 }
 
 function addStudent() {
@@ -74,7 +123,11 @@ function updateStudentName(index, name) {
 
 function updateStudentTarget(index, target) {
     students[index].target = parseInt(target) || 6;
-    updateStats();
+    if (studentSortMode === 'count') {
+        renderStudents();
+    } else {
+        updateStats();
+    }
 }
 
 function applyDefaultTarget() {
@@ -172,34 +225,74 @@ function removeInterviewer(type, index) {
     renderInterviewers();
 }
 
+// Flexible UI Logic
+function toggleFlexibleBreaks() {
+    const isFlexible = document.getElementById('breaks-flexible').checked;
+    const maxContainer = document.getElementById('breaks-max-container');
+    const labelMode = document.getElementById('breaks-label-mode');
+
+    if (isFlexible) {
+        maxContainer.style.display = 'flex';
+        labelMode.textContent = 'Min';
+    } else {
+        maxContainer.style.display = 'none';
+        labelMode.textContent = 'Exact';
+    }
+    updateStats();
+}
+
 // Stats & Capacity Logic
 function updateStats() {
     const totalStudents = students.length;
     const totalDemand = students.reduce((sum, s) => sum + s.target, 0);
     const totalInterviewers = physicalInterviewers.length + virtualInterviewers.length;
     const numSlots = parseInt(document.getElementById('num-slots').value) || 13;
-    const breaks = parseInt(document.getElementById('breaks').value) || 1;
-    const capacity = totalInterviewers * (numSlots - breaks);
+
+    // Calculate breaks - if flexible, use average for capacity estimation
+    const breaksMin = parseInt(document.getElementById('breaks-min').value) || 1;
+    const isFlexible = document.getElementById('breaks-flexible').checked;
+    let breaksMax = breaksMin;
+    let effectiveBreaks = breaksMin;
+
+    if (isFlexible) {
+        breaksMax = parseInt(document.getElementById('breaks-max').value) || 1;
+        // Conservative estimate: use max breaks for capacity to avoid over-promising
+        // Or user average? Let's use MIN breaks for "Available Slots" to show potential MAXIMUM capacity
+        // But maybe show a range? Let's stick to simple for now: use Min breaks to show best case.
+        effectiveBreaks = breaksMin;
+    }
+
+    const capacityMin = totalInterviewers * (numSlots - breaksMax);
+    const capacityMax = totalInterviewers * (numSlots - breaksMin);
+
+    let capacityText = `${capacityMin}`;
+    if (capacityMin !== capacityMax) {
+        capacityText = `${capacityMin} - ${capacityMax}`;
+    }
 
     document.getElementById('student-count').textContent = `${totalStudents} students`;
     document.getElementById('student-demand').textContent = `Total interviews needed: ${totalDemand}`;
     document.getElementById('interviewer-count').textContent = `${totalInterviewers} interviewers`;
-    document.getElementById('capacity-display').textContent = `Available interview slots: ${capacity}`;
+    document.getElementById('capacity-display').textContent = `Available slots: ${capacityText}`;
 
     // Detailed Capacity Summary
     const summaryEl = document.getElementById('capacity-summary');
-    const diff = capacity - totalDemand;
 
-    if (diff === 0) {
-        summaryEl.innerHTML = `<span class="match">Perfect Match!</span> Supply equals Demand (${capacity} each).`;
-    } else if (diff > 0) {
-        summaryEl.innerHTML = `<span class="match">Good.</span> You have ${diff} extra interview slots available.`;
+    // For logic, use the MAX capacity to be optimistic/permissive, or MIN to be safe?
+    // Using Min breaks (Max capacity) allows the solver to try its best.
+    const optimisticDiff = capacityMax - totalDemand;
+    const pessimisticDiff = capacityMin - totalDemand;
+
+    if (pessimisticDiff >= 0) {
+        summaryEl.innerHTML = `<span class="match">Values align.</span> Sufficient capacity (${capacityText}).`;
+    } else if (optimisticDiff >= 0) {
+        summaryEl.innerHTML = `<span class="match" style="color:var(--warning)">Tight Fit.</span> Demand is within the flexible range (${capacityText}). Solver might find a way.`;
     } else {
-        const deficit = Math.abs(diff);
+        const deficit = Math.abs(optimisticDiff);
         summaryEl.innerHTML = `
             <div style="display: flex; align-items: center; gap: 12px;">
                 <span class="mismatch">Warning:</span> 
-                <span>You need <strong>${deficit} more slots</strong>.</span>
+                <span>You need <strong>${deficit} more slots</strong> (best case).</span>
                 <button class="btn btn-sm btn-gold" onclick="runAutoBalance(${deficit})">⚡ Auto-Reduce & Solve</button>
             </div>
         `;
@@ -255,11 +348,22 @@ async function generateSchedule(autoBalance = false) {
     const seedInput = document.getElementById('seed').value;
     const seed = seedInput ? parseInt(seedInput) : null;
 
+    // Parse breaks
+    const breaksMin = parseInt(document.getElementById('breaks-min').value) || 1;
+    let breaksMax = breaksMin;
+    if (document.getElementById('breaks-flexible').checked) {
+        breaksMax = parseInt(document.getElementById('breaks-max').value) || breaksMin;
+    }
+
+    // Ensure logical constraint
+    if (breaksMax < breaksMin) breaksMax = breaksMin;
+
     const payload = {
         students,
         interviewers,
         num_slots: parseInt(document.getElementById('num-slots').value) || 13,
-        breaks_per_interviewer: parseInt(document.getElementById('breaks').value) || 1,
+        breaks_min: breaksMin,
+        breaks_max: breaksMax,
         min_virtual_per_student: parseInt(document.getElementById('min-virtual').value) || 1,
         seed,
         auto_balance: autoBalance
@@ -385,13 +489,19 @@ function displaySchedule(result) {
 
     // Render Assignments Table
     if (invAssignments.length > 0) {
-        assignmentsBody.innerHTML = invAssignments.map(inv => `
+        assignmentsBody.innerHTML = invAssignments.map(inv => {
+            const breaks = inv.break_slot;
+            const label = breaks.includes(',') ? 'Slots' : 'Slot';
+            const breakText = breaks === 'None' ? '-' : `${label} ${breaks}`;
+
+            return `
             <tr>
                 <td>${escapeHtml(inv.name)}</td>
                 <td><strong>${escapeHtml(inv.id)}</strong></td>
-                <td>${inv.break_slot === 'None' ? '-' : 'Slot ' + inv.break_slot}</td>
+                <td>${breakText}</td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
     } else {
         assignmentsBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#999;">No assignment data available.</td></tr>';
     }
