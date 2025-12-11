@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interview Scheduler | Baylor University</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Interview Scheduler</h1>
+            <p class="subtitle">Mock Interview Assignment Tool</p>
+        </header>
+
+        <main class="main-content">
+            <!-- Step 1: Students -->
+            <section class="config-panel">
+                <div class="config-section">
+                    <div class="section-header">
+                        <h2>Step 1: Enter Student Names</h2>
+                        <div class="header-actions">
+                            <button class="btn btn-sm btn-primary" onclick="addStudent()">+ Add Student</button>
+                            <button class="btn btn-sm btn-secondary" onclick="bulkAddStudents()">Paste List</button>
+                            <button class="btn btn-sm btn-secondary" onclick="clearStudents()">Clear All</button>
+                        </div>
+                    </div>
+
+                    <div class="help-text">
+                        <strong>Instructions:</strong> Add all students who need interviews.
+                        The number next to each name is how many interviews that student will receive.
+                        Most students get <strong>6 interviews</strong> by default.
+                        You can change individual counts by editing the number.
+                    </div>
+
+                    <div class="student-list" id="student-list">
+                        <!-- Students will be added here -->
+                    </div>
+                    <div class="section-stats">
+                        <span id="student-count">0 students</span>
+                        <span id="student-demand">Total interviews needed: 0</span>
+                    </div>
+                </div>
+
+                <!-- Step 2: Interviewers -->
+                <div class="config-section">
+                    <div class="section-header">
+                        <h2>Step 2: Enter Interviewer Names</h2>
+                        <div class="header-actions">
+                            <button class="btn btn-sm btn-primary" onclick="addInterviewer(false)">+ In-Person</button>
+                            <button class="btn btn-sm btn-secondary" onclick="addInterviewer(true)">+ Virtual</button>
+                        </div>
+                    </div>
+
+                    <div class="help-text">
+                        <strong>Instructions:</strong> Add all available interviewers.
+                        <strong>Virtual interviewers</strong> conduct interviews via Zoom/Teams.
+                        Each student will be guaranteed at least one virtual interview.
+                    </div>
+
+                    <div class="interviewer-groups">
+                        <div class="interviewer-group">
+                            <h3>In-Person Interviewers</h3>
+                            <div class="interviewer-list" id="physical-interviewer-list"></div>
+                        </div>
+                        <div class="interviewer-group virtual">
+                            <h3>Virtual Interviewers</h3>
+                            <div class="interviewer-list" id="virtual-interviewer-list"></div>
+                        </div>
+                    </div>
+                    <div class="section-stats">
+                        <span id="interviewer-count">0 interviewers</span>
+                        <span id="capacity-display">Available interview slots: 0</span>
+                    </div>
+                </div>
+
+                <!-- Step 3: Settings -->
+                <div class="config-section constraints-section">
+                    <div class="section-header">
+                        <h2>Step 3: Schedule Settings</h2>
+                    </div>
+
+                    <div class="constraints-grid">
+                        <div class="constraint-field">
+                            <label for="num-slots">Number of Time Slots</label>
+                            <input type="number" id="num-slots" value="13" min="1" max="20" onchange="updateCapacity()">
+                            <span class="constraint-help">How many interview periods in the day</span>
+                        </div>
+                        <div class="constraint-field">
+                            <label for="breaks">Breaks per Interviewer</label>
+                            <input type="number" id="breaks" value="1" min="0" max="5" onchange="updateCapacity()">
+                            <span class="constraint-help">Each interviewer gets this many break periods</span>
+                        </div>
+                        <div class="constraint-field">
+                            <label for="default-target">Default Interviews per Student</label>
+                            <input type="number" id="default-target" value="6" min="1" max="13"
+                                onchange="applyDefaultTarget()">
+                            <span class="constraint-help">New students will be assigned this many</span>
+                        </div>
+                        <div class="constraint-field">
+                            <label for="min-virtual">Min Virtual Interviews</label>
+                            <input type="number" id="min-virtual" value="1" min="0" max="5">
+                            <span class="constraint-help">Minimum virtual interviews per student</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <div class="action-bar">
+                    <div class="capacity-summary" id="capacity-summary">
+                        <!-- Capacity info will be shown here -->
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <div class="seed-control">
+                            <label for="seed">Seed:</label>
+                            <input type="number" id="seed" placeholder="Random">
+                            <button class="btn btn-sm btn-secondary" onclick="randomizeSeed()"
+                                title="Random seed">🎲</button>
+                        </div>
+                        <button class="btn btn-gold btn-lg" onclick="generateSchedule()" id="generate-btn">
+                            Generate Schedule
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Panel -->
+            <section class="results-panel" id="results-panel" style="display: none;">
+                <div class="results-header">
+                    <h2>Generated Schedule</h2>
+                    <div class="results-actions">
+                        <button class="btn btn-sm btn-primary" onclick="exportCSV()">Download CSV</button>
+                        <button class="btn btn-sm btn-secondary" onclick="window.print()">Print</button>
+                        <button class="btn btn-sm btn-secondary" onclick="regenerate()">Generate Another</button>
+                    </div>
+                </div>
+
+                <div class="results-stats" id="results-stats"></div>
+
+                <div class="schedule-container">
+                    <table class="schedule-table" id="schedule-table">
+                        <thead id="schedule-header"></thead>
+                        <tbody id="schedule-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Loading/Error States -->
+            <div class="status-overlay" id="loading-overlay" style="display: none;">
+                <div class="spinner"></div>
+                <p>Generating schedule... This may take a few seconds.</p>
+            </div>
+
+            <div class="error-message" id="error-message" style="display: none;"></div>
+        </main>
+    </div>
+
+    <!-- Bulk Add Modal -->
+    <div class="modal" id="bulk-modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Paste Student List</h3>
+            <p>Paste student names below, one name per line. You can copy directly from Excel or a Word document.</p>
+            <textarea id="bulk-input" rows="12"
+                placeholder="John Smith&#10;Jane Doe&#10;Alex Johnson&#10;..."></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeBulkModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="processBulkAdd()">Add Students</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic Message Modal -->
+    <div class="modal" id="message-modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="modal-title">Title</h3>
+            <p id="modal-message">Message goes here</p>
+            <div id="modal-input-container" style="display: none; margin-bottom: 20px;">
+                <input type="text" id="modal-input" class="modal-input" placeholder="">
+            </div>
+            <div class="modal-actions" id="modal-actions">
+                <!-- Buttons injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+    <script>
+        // Initialize with default data
+        const defaultStudents = {{ default_students | tojson }};
+        const defaultPhysical = {{ default_physical | tojson }};
+        const defaultVirtual = {{ default_virtual | tojson }};
+
+        initializeApp(defaultStudents, defaultPhysical, defaultVirtual);
+    </script>
+</body>
+
+</html>
