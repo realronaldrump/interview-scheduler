@@ -667,6 +667,11 @@ body {
 
 /* Print Styles */
 @media print {
+    @page {
+        size: landscape;
+        margin: 0.5cm;
+    }
+
     body {
         background: white;
         font-size: 11pt;
@@ -683,23 +688,50 @@ body {
         border: none;
         box-shadow: none;
         padding: 0;
+        margin: 0;
+    }
+
+    .schedule-container {
+        border: none;
+        overflow: visible;
     }
 
     .schedule-table {
-        font-size: 9pt;
+        font-size: 8pt;
+        /* Smaller font to fit */
+        width: 100%;
+        border-collapse: collapse;
     }
 
     .schedule-table th,
     .schedule-table td {
-        border: 1px solid #999;
-        padding: 4px 6px;
+        border: 1px solid #666;
+        padding: 2px 4px;
+        /* Tighter padding */
     }
 
     .schedule-table th {
-        background: #154734 !important;
+        background-color: #154734 !important;
         color: white !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+    }
+
+    .schedule-table td.virtual {
+        background-color: #e6f3ff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .schedule-table td.total {
+        background-color: #FFB81C !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    /* Ensure page breaks don't cut inside rows if possible, though large tables might need it */
+    tr {
+        page-break-inside: avoid;
     }
 }
 

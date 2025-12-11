@@ -7,6 +7,7 @@ import csv
 import io
 import random
 import string
+import pandas as pd
 from solver import solve_schedule, validate_schedule
 
 def get_table_letter(index):
@@ -194,31 +195,119 @@ def solve():
 
 
 @app.route('/api/export', methods=['POST'])
-def export_csv():
-    """Export schedule as CSV."""
+def export_schedule():
+    """Export schedule as Excel (styled) or CSV."""
     data = request.json
     schedule = data.get('schedule', {})
     num_slots = int(data.get('num_slots', 13))
+    export_format = data.get('format', 'xlsx')  # Default to xlsx
+
+    # Prepare Data
+    # Rows: Student Name, Slot 1, Slot 2, ..., Total
+    headers = ['Student Name'] + [f'Slot {i+1}' for i in range(num_slots)] + ['Total']
+    rows = []
     
-    output = io.StringIO()
-    writer = csv.writer(output)
+    # Identify Virtual Interviewers to style them
+    # We need to pass virtual interviewers list or infer it? 
+    # Current frontend sends 'schedule'. We might need to know who is virtual.
+    # The frontend payload for export is currently just {schedule, num_slots}.
+    # We should update frontend to send 'virtual_interviewers' list or similar to help with styling.
+    # OR we can just rely on the schedule if we can't easily get it. 
+    # BUT the user asked for "match styling as seen in app" which distinguishes virtual.
+    # So I will assume the frontend will send `virtual_interviewers` list.
     
-    # Header
-    header = ['Student'] + [f'#{i+1}' for i in range(num_slots)] + ['Total']
-    writer.writerow(header)
-    
-    # Data rows
+    virtual_interviewers = set(data.get('virtual_interviewers', []))
+
     for name, slots in schedule.items():
-        row = [name] + [s if s else 'WAIT' for s in slots]
-        total = sum(1 for s in slots if s)
-        row.append(total)
-        writer.writerow(row)
+        row_data = [name]
+        count = 0
+        for s in slots:
+            if s:
+                row_data.append(s)
+                count += 1
+            else:
+                row_data.append('BREAK') # Or empty? App shows "Break" in wait slots in logic check? No, app shows "Break" if null.
+        
+        row_data.append(count)
+        rows.append(row_data)
+
+    df = pd.DataFrame(rows, columns=headers)
+
+    output = io.BytesIO()
     
+    # Create Excel Writer using xlsxwriter
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, sheet_name='Schedule', index=False, startrow=1) # Start at row 1 to leave room for custom header if needed, or just 0. Let's do 0 but manual write.
+        
+        workbook = writer.book
+        worksheet = writer.sheets['Schedule']
+        
+        # Styles
+        header_format = workbook.add_format({
+            'bold': True,
+            'text_wrap': True,
+            'valign': 'top',
+            'fg_color': '#154734', # Baylor Green
+            'font_color': '#FFFFFF',
+            'border': 1
+        })
+        
+        cell_format = workbook.add_format({'border': 1})
+        
+        virtual_format = workbook.add_format({
+            'bg_color': '#E6F3FF',
+            'font_color': '#0066CC',
+            'bold': True,
+            'border': 1
+        })
+        
+        break_format = workbook.add_format({
+            'font_color': '#999999',
+            'italic': True,
+            'border': 1,
+            'bg_color': '#FAFAFA'
+        })
+        
+        name_format = workbook.add_format({
+            'bold': True,
+            'border': 1,
+            'bg_color': '#F8F8F8'
+        })
+
+        # Write Header manually to apply style
+        for col_num, value in enumerate(df.columns.values):
+            worksheet.write(0, col_num, value, header_format)
+
+        # Write Data with conditional formatting
+        # Iterate over df rows
+        for row_num, row_data in enumerate(rows):
+            # Write Name (Col 0)
+            worksheet.write(row_num + 1, 0, row_data[0], name_format)
+            
+            # Write Slots
+            for col_num in range(1, num_slots + 1):
+                cell_val = row_data[col_num]
+                
+                # Check style
+                if cell_val == 'BREAK':
+                    worksheet.write(row_num + 1, col_num, "Break", break_format)
+                elif cell_val in virtual_interviewers:
+                    worksheet.write(row_num + 1, col_num, cell_val, virtual_format)
+                else:
+                    worksheet.write(row_num + 1, col_num, cell_val, cell_format)
+            
+            # Write Total (Last Col)
+            worksheet.write(row_num + 1, num_slots + 1, row_data[-1], name_format)
+
+        # Auto-fit columns
+        worksheet.autofit()
+
     output.seek(0)
+    
     return Response(
         output.getvalue(),
-        mimetype='text/csv',
-        headers={'Content-Disposition': 'attachment; filename=interview_schedule.csv'}
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename=interview_schedule.xlsx'}
     )
 
 

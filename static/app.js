@@ -556,14 +556,19 @@ async function exportCSV() {
         const response = await fetch('/api/export', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ schedule: currentSchedule, num_slots: numSlots })
+            body: JSON.stringify({
+                schedule: currentSchedule,
+                num_slots: numSlots,
+                virtual_interviewers: virtualInterviewers,
+                format: 'xlsx'
+            })
         });
 
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'interview_schedule.csv';
+        a.download = 'interview_schedule.xlsx';
         a.click();
         URL.revokeObjectURL(url);
     } catch (err) {
