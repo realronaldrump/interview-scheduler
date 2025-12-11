@@ -129,10 +129,22 @@ body {
 }
 
 /* Student/Interviewer Lists */
-.student-list,
-.interviewer-list {
+.student-list {
     display: flex;
     flex-wrap: wrap;
+    gap: 8px;
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 12px;
+    background: var(--bg-section);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    margin-bottom: 12px;
+}
+
+.interviewer-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 8px;
     max-height: 240px;
     overflow-y: auto;
@@ -147,6 +159,7 @@ body {
 .interviewer-item {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
     padding: 8px 12px;
     background: white;
