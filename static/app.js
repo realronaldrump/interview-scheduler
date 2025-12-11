@@ -25,6 +25,7 @@ function initializeApp(defaultStudents, defaultPhysical, defaultVirtual) {
     renderStudents();
     renderInterviewers();
     updateStats();
+    updateVirtualGuarantee();
 }
 
 // Student Management
@@ -252,6 +253,16 @@ function toggleFlexibleVirtual() {
     } else {
         maxContainer.style.display = 'none';
         labelMode.textContent = 'Exact';
+    }
+    updateVirtualGuarantee();
+}
+
+function updateVirtualGuarantee() {
+    const min = parseInt(document.getElementById('min-virtual').value) || 0;
+    const textEl = document.getElementById('virtual-guarantee-text');
+    if (textEl) {
+        const suffix = min === 1 ? 'virtual interview' : 'virtual interviews';
+        textEl.innerHTML = `<strong>${min}</strong> ${suffix}`;
     }
 }
 

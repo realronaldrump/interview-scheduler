@@ -72,7 +72,8 @@
                     <div class="help-text">
                         <strong>Instructions:</strong> Add all available interviewers.
                         <strong>Virtual interviewers</strong> conduct interviews via Zoom/Teams.
-                        Each student will be guaranteed at least one virtual interview.
+                        Each student will be guaranteed at least <span id="virtual-guarantee-text"><strong>1</strong>
+                            virtual interview</span>.
                     </div>
 
                     <div class="interviewer-groups">
@@ -135,7 +136,8 @@
                             <label>Virtual Interviews per Student</label>
                             <div class="flex-input-group">
                                 <div class="primary-input">
-                                    <input type="number" id="min-virtual" value="1" min="0" max="5">
+                                    <input type="number" id="min-virtual" value="1" min="0" max="5"
+                                        onchange="updateVirtualGuarantee()">
                                     <span class="input-label" id="virtual-label-mode">Min</span>
                                 </div>
                                 <div class="secondary-input" id="virtual-max-container" style="display: flex;">
