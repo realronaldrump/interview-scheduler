@@ -34,8 +34,8 @@ DEFAULT_STUDENTS = [
     "Kenzie Wheeler", "Rena Wilhite"
 ]
 
-DEFAULT_PHYSICAL_INTERVIEWERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M']
-DEFAULT_VIRTUAL_INTERVIEWERS = ['Z-1', 'Z-2', 'Z-3', 'Z-4']
+DEFAULT_PHYSICAL_INTERVIEWERS = ['Christy Bickerstaff', 'Sarah Morris', 'Abby Hazel', 'Kat Elliot', 'Christy Proctor', 'Lexi English', 'Amy Rylander', 'Ashleigh Bickerstaff', 'Desi Gallagher', 'Ronald English', 'Sydney Withey', 'Taylor Wold', 'Abi Young']
+DEFAULT_VIRTUAL_INTERVIEWERS = ['Laura McDonald', 'Heather Brandon', 'Rachel Gillock', 'Maggie Light']
 
 
 @app.route('/')
