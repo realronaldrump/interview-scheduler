@@ -187,10 +187,14 @@ function renderInterviewers() {
     if (physicalInterviewers.length === 0) {
         physContainer.innerHTML = '<div style="color: #999; font-style: italic; font-size: 13px;">No in-person interviewers added.</div>';
     } else {
-        physContainer.innerHTML = physicalInterviewers.map((name, i) => `
+        const sortedPhysical = physicalInterviewers
+            .map((name, i) => ({ name, originalIndex: i }))
+            .sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)));
+
+        physContainer.innerHTML = sortedPhysical.map(item => `
             <div class="interviewer-item">
-                <span contenteditable="true" onblur="updateInterviewerName('physical', ${i}, this.innerText)">${escapeHtml(name)}</span>
-                <button class="remove-btn" onclick="removeInterviewer('physical', ${i})">×</button>
+                <span contenteditable="true" onblur="updateInterviewerName('physical', ${item.originalIndex}, this.innerText)">${escapeHtml(item.name)}</span>
+                <button class="remove-btn" onclick="removeInterviewer('physical', ${item.originalIndex})">×</button>
             </div>
         `).join('');
     }
@@ -198,10 +202,14 @@ function renderInterviewers() {
     if (virtualInterviewers.length === 0) {
         virtContainer.innerHTML = '<div style="color: #999; font-style: italic; font-size: 13px;">No virtual interviewers added.</div>';
     } else {
-        virtContainer.innerHTML = virtualInterviewers.map((name, i) => `
+        const sortedVirtual = virtualInterviewers
+            .map((name, i) => ({ name, originalIndex: i }))
+            .sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)));
+
+        virtContainer.innerHTML = sortedVirtual.map(item => `
             <div class="interviewer-item virtual">
-                <span contenteditable="true" onblur="updateInterviewerName('virtual', ${i}, this.innerText)">${escapeHtml(name)}</span>
-                <button class="remove-btn" onclick="removeInterviewer('virtual', ${i})">×</button>
+                <span contenteditable="true" onblur="updateInterviewerName('virtual', ${item.originalIndex}, this.innerText)">${escapeHtml(item.name)}</span>
+                <button class="remove-btn" onclick="removeInterviewer('virtual', ${item.originalIndex})">×</button>
             </div>
         `).join('');
     }
