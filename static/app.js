@@ -499,23 +499,46 @@ function displaySchedule(result) {
         `;
     }).join('');
 
+    // Calculate total interviews per interviewer
+    const interviewCounts = {};
+    Object.values(schedule).forEach(studentSchedule => {
+        studentSchedule.forEach(interviewerName => {
+            if (interviewerName) {
+                interviewCounts[interviewerName] = (interviewCounts[interviewerName] || 0) + 1;
+            }
+        });
+    });
+
     // Render Assignments Table
     if (invAssignments.length > 0) {
+        // Update header to include Total Interviews
+        const assignmentsHeader = document.querySelector('#assignments-table thead tr');
+        if (assignmentsHeader) {
+            assignmentsHeader.innerHTML = `
+                <th>Interviewer Name</th>
+                <th>Assigned Table / ID</th>
+                <th>Break Slot</th>
+                <th>Total Interviews</th>
+            `;
+        }
+
         assignmentsBody.innerHTML = invAssignments.map(inv => {
             const breaks = inv.break_slot;
             const label = breaks.includes(',') ? 'Slots' : 'Slot';
             const breakText = breaks === 'None' ? '-' : `${label} ${breaks}`;
+            const count = interviewCounts[inv.name] || 0;
 
             return `
             <tr>
                 <td>${escapeHtml(inv.name)}</td>
                 <td><strong>${escapeHtml(inv.id)}</strong></td>
                 <td>${breakText}</td>
+                <td>${count}</td>
             </tr>
             `;
         }).join('');
     } else {
-        assignmentsBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#999;">No assignment data available.</td></tr>';
+        assignmentsBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999;">No assignment data available.</td></tr>';
     }
 
     panel.style.display = 'block';
