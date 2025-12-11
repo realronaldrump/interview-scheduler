@@ -322,6 +322,45 @@ function updateStats() {
     document.getElementById('interviewer-count').textContent = `${totalInterviewers} interviewers`;
     document.getElementById('capacity-display').textContent = `Available slots: ${capacityText}`;
 
+    // Update "Most students get X interviews" text
+    let modeTarget = parseInt(document.getElementById('default-target').value) || 6;
+
+    if (totalStudents > 0) {
+        const counts = {};
+        students.forEach(s => {
+            counts[s.target] = (counts[s.target] || 0) + 1;
+        });
+
+        let maxFreq = 0;
+        // Reset modeTarget if we have actual data to derive it from
+        // However, if we initialize modeTarget to default, we might stick to it if no clear mode?
+        // Let's iterate and find the best mode.
+
+        Object.entries(counts).forEach(([target, freq]) => {
+            const t = parseInt(target);
+            if (freq > maxFreq) {
+                maxFreq = freq;
+                modeTarget = t;
+            } else if (freq === maxFreq) {
+                // Tie-breaker: prefer the current default if it's one of the winners
+                const currentDefault = parseInt(document.getElementById('default-target').value) || 6;
+                if (t === currentDefault) {
+                    modeTarget = t;
+                } else if (modeTarget !== currentDefault && t > modeTarget) {
+                    // Otherwise prefer higher number
+                    modeTarget = t;
+                }
+            }
+        });
+    }
+
+    const modeTextEl = document.getElementById('most-frequent-target');
+    if (modeTextEl) {
+        const suffix = modeTarget === 1 ? 'interview' : 'interviews';
+        modeTextEl.innerHTML = `${modeTarget} ${suffix}`;
+    }
+
+
     // Detailed Capacity Summary
     const summaryEl = document.getElementById('capacity-summary');
 
