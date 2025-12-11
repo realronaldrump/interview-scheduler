@@ -134,15 +134,16 @@
                             <div class="flex-input-group">
                                 <div class="primary-input">
                                     <input type="number" id="min-virtual" value="1" min="0" max="5">
-                                    <span class="input-label" id="virtual-label-mode">Exact</span>
+                                    <span class="input-label" id="virtual-label-mode">Min</span>
                                 </div>
-                                <div class="secondary-input" id="virtual-max-container" style="display: none;">
+                                <div class="secondary-input" id="virtual-max-container" style="display: flex;">
                                     <span class="separator">-</span>
-                                    <input type="number" id="max-virtual" value="1" min="0" max="5">
+                                    <input type="number" id="max-virtual" value="2" min="0" max="5">
                                     <span class="input-label">Max</span>
                                 </div>
                                 <div class="toggle-wrapper">
-                                    <input type="checkbox" id="virtual-flexible" onchange="toggleFlexibleVirtual()">
+                                    <input type="checkbox" id="virtual-flexible" checked
+                                        onchange="toggleFlexibleVirtual()">
                                     <label for="virtual-flexible"
                                         title="Allow a range of virtual interviews (e.g., 1 to 2)">Flexible?</label>
                                 </div>

@@ -465,20 +465,7 @@ function displaySchedule(result) {
         });
     }
 
-    statsContainer.innerHTML = `
-        <div class="stat-item">
-            <span class="stat-label">Success</span>
-            <span class="stat-value" style="color: var(--success)">Schedule Generated</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">Total Interviews</span>
-            <span class="stat-value">${stats.total_interviews}</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-label">Capacity Utilization</span>
-            <span class="stat-value">${Math.round(stats.total_interviews / stats.capacity * 100)}%</span>
-        </div>
-    `;
+    statsContainer.style.display = 'none';
 
     headerEl.innerHTML = `
         <tr>
