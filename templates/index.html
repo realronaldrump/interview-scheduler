@@ -130,9 +130,25 @@
                             <span class="constraint-help">New students will be assigned this many</span>
                         </div>
                         <div class="constraint-field">
-                            <label for="min-virtual">Min Virtual Interviews</label>
-                            <input type="number" id="min-virtual" value="1" min="0" max="5">
-                            <span class="constraint-help">Minimum virtual interviews per student</span>
+                            <label>Virtual Interviews per Student</label>
+                            <div class="flex-input-group">
+                                <div class="primary-input">
+                                    <input type="number" id="min-virtual" value="1" min="0" max="5">
+                                    <span class="input-label" id="virtual-label-mode">Exact</span>
+                                </div>
+                                <div class="secondary-input" id="virtual-max-container" style="display: none;">
+                                    <span class="separator">-</span>
+                                    <input type="number" id="max-virtual" value="1" min="0" max="5">
+                                    <span class="input-label">Max</span>
+                                </div>
+                                <div class="toggle-wrapper">
+                                    <input type="checkbox" id="virtual-flexible" onchange="toggleFlexibleVirtual()">
+                                    <label for="virtual-flexible"
+                                        title="Allow a range of virtual interviews (e.g., 1 to 2)">Flexible?</label>
+                                </div>
+                            </div>
+                            <span class="constraint-help">Number of virtual interviews per student (Exact or
+                                Range)</span>
                         </div>
                     </div>
                 </div>

@@ -241,6 +241,20 @@ function toggleFlexibleBreaks() {
     updateStats();
 }
 
+function toggleFlexibleVirtual() {
+    const isFlexible = document.getElementById('virtual-flexible').checked;
+    const maxContainer = document.getElementById('virtual-max-container');
+    const labelMode = document.getElementById('virtual-label-mode');
+
+    if (isFlexible) {
+        maxContainer.style.display = 'flex';
+        labelMode.textContent = 'Min';
+    } else {
+        maxContainer.style.display = 'none';
+        labelMode.textContent = 'Exact';
+    }
+}
+
 // Stats & Capacity Logic
 function updateStats() {
     const totalStudents = students.length;
@@ -358,13 +372,24 @@ async function generateSchedule(autoBalance = false) {
     // Ensure logical constraint
     if (breaksMax < breaksMin) breaksMax = breaksMin;
 
+    // Parse virtual interviews
+    const minVirtual = parseInt(document.getElementById('min-virtual').value) || 1;
+    let maxVirtual = minVirtual;
+    if (document.getElementById('virtual-flexible').checked) {
+        maxVirtual = parseInt(document.getElementById('max-virtual').value) || minVirtual;
+    }
+
+    // Ensure logical constraint
+    if (maxVirtual < minVirtual) maxVirtual = minVirtual;
+
     const payload = {
         students,
         interviewers,
         num_slots: parseInt(document.getElementById('num-slots').value) || 13,
         breaks_min: breaksMin,
         breaks_max: breaksMax,
-        min_virtual_per_student: parseInt(document.getElementById('min-virtual').value) || 1,
+        min_virtual_per_student: minVirtual,
+        max_virtual_per_student: maxVirtual,
         seed,
         auto_balance: autoBalance
     };

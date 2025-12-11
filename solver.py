@@ -15,6 +15,7 @@ def solve_schedule(
     breaks_min: int = 1,
     breaks_max: int = 1,
     min_virtual_per_student: int = 1,
+    max_virtual_per_student: int = 1,
     seed: Optional[int] = None
 ) -> dict:
     """
@@ -27,6 +28,7 @@ def solve_schedule(
         breaks_min: Minimum breaks each interviewer must take
         breaks_max: Maximum breaks each interviewer must take
         min_virtual_per_student: Minimum virtual interviews per student
+        max_virtual_per_student: Maximum virtual interviews per student
         seed: Random seed for reproducibility (optional)
     
     Returns:
@@ -118,6 +120,10 @@ def solve_schedule(
                                     for t in range(num_slots) 
                                     for i in virtual_interviewers)
             model.Add(virtual_interviews >= min_virtual_per_student)
+            
+            # Constraint: Max virtual interviews
+            if max_virtual_per_student >= min_virtual_per_student:
+                model.Add(virtual_interviews <= max_virtual_per_student)
     
     # Solve
     solver = cp_model.CpSolver()
@@ -185,7 +191,7 @@ def solve_schedule(
 
 
 def validate_schedule(schedule: dict, students: list[dict], interviewers: list[dict], 
-                      num_slots: int, min_virtual: int = 1) -> list[str]:
+                      num_slots: int, min_virtual: int = 1, max_virtual: int = 1) -> list[str]:
     """Validate a schedule meets all constraints."""
     errors = []
     
@@ -204,6 +210,8 @@ def validate_schedule(schedule: dict, students: list[dict], interviewers: list[d
         virt = sum(1 for s in slots if s in virtual_names)
         if virt < min_virtual:
             errors.append(f"{name}: only {virt} virtual interviews, need {min_virtual}")
+        if virt > max_virtual:
+            errors.append(f"{name}: got {virt} virtual interviews, max allowed is {max_virtual}")
     
     # Check no duplicate interviewers per student
     for name, slots in schedule.items():

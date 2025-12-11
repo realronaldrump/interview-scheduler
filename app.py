@@ -89,6 +89,8 @@ def solve():
     breaks_max = int(data.get('breaks_max', breaks_min))
     
     min_virtual = int(data.get('min_virtual_per_student', 1))
+    max_virtual = int(data.get('max_virtual_per_student', min_virtual))
+    
     auto_balance = data.get('auto_balance', False)
     seed = data.get('seed')
     
@@ -141,13 +143,14 @@ def solve():
         breaks_min=breaks_min,
         breaks_max=breaks_max,
         min_virtual_per_student=min_virtual,
+        max_virtual_per_student=max_virtual,
         seed=seed
     )
     
     # Add validation if successful
     if result['success']:
         errors = validate_schedule(
-            result['schedule'], students, interviewers, num_slots, min_virtual
+            result['schedule'], students, interviewers, num_slots, min_virtual, max_virtual
         )
         result['validation_errors'] = errors
         result['seed_used'] = seed
