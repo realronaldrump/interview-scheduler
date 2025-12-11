@@ -59,8 +59,8 @@ function removeStudent(index) {
     renderStudents();
 }
 
-function clearStudents() {
-    if (confirm('Are you sure you want to remove all students?')) {
+async function clearStudents() {
+    if (await showConfirm('Clear All Students', 'Are you sure you want to remove all students? This cannot be undone.', 'warning')) {
         students = [];
         renderStudents();
     }
@@ -76,12 +76,7 @@ function updateStudentTarget(index, target) {
 }
 
 function applyDefaultTarget() {
-    const newDefault = parseInt(document.getElementById('default-target').value) || 6;
-    // Don't overwrite existing targets automatically, just useful for new ones.
-    // But maybe we want a "Apply to all" button? 
-    // For now, let's just leave it impacting new students.
-    // If the user wants to apply to all, we could add that feature, 
-    // but typically they might have customized some.
+    // Optional utility to apply default to all
 }
 
 function bulkAddStudents() {
@@ -144,9 +139,9 @@ function renderInterviewers() {
     updateStats();
 }
 
-function addInterviewer(isVirtual) {
+async function addInterviewer(isVirtual) {
     const typeLabel = isVirtual ? 'Virtual' : 'In-Person';
-    const name = prompt(`Enter Name for ${typeLabel} Interviewer:`);
+    const name = await showPrompt(`Add ${typeLabel} Interviewer`, `Enter name for the new ${typeLabel.toLowerCase()} interviewer:`);
     if (!name) return;
 
     if (isVirtual) {
@@ -164,7 +159,6 @@ function updateInterviewerName(type, index, newName) {
     } else {
         virtualInterviewers[index] = newName.trim();
     }
-    // No visual re-render needed as we used contenteditable, but good to clean up
 }
 
 function removeInterviewer(type, index) {
@@ -218,8 +212,12 @@ function randomizeSeed() {
     document.getElementById('seed').value = Math.floor(Math.random() * 100000);
 }
 
-function runAutoBalance(deficit) {
-    if (confirm(`You are over capacity by ${deficit} interviews.\n\nThis will RANDOMLY reduce ${deficit} students' interview counts (e.g. from 6 to 5) to make the schedule fit.\n\nProceed?`)) {
+async function runAutoBalance(deficit) {
+    if (await showConfirm(
+        'Auto-Balance Schedule',
+        `You are over capacity by ${deficit} interviews.<br><br>This will <strong>randomly reduce</strong> ${deficit} students' interview counts (e.g. from 6 to 5) to make the schedule fit.<br><br>Do you want to proceed?`,
+        'warning'
+    )) {
         generateSchedule(true);
     }
 }
@@ -233,12 +231,12 @@ async function generateSchedule(autoBalance = false) {
     // Check basic validity
     const totalStudents = students.length;
     if (totalStudents === 0) {
-        alert("Please add at least one student.");
+        showMessage('Missing Information', 'Please add at least one student.', 'warning');
         return;
     }
     const totalInterviewers = physicalInterviewers.length + virtualInterviewers.length;
     if (totalInterviewers === 0) {
-        alert("Please add at least one interviewer.");
+        showMessage('Missing Information', 'Please add at least one interviewer.', 'warning');
         return;
     }
 
@@ -277,23 +275,15 @@ async function generateSchedule(autoBalance = false) {
         if (result.success) {
             currentSchedule = result.schedule;
             lastSeedUsed = result.seed_used;
-            if (!seedInput) {
-                // Determine a seed was used if not provided
-                // But we don't necessarily need to show it aggressively in the simple UI
-            }
 
-            // Sync updated student targets if auto-balanced
             if (result.students_used) {
-                // Update local state with the actual targets used by server
-                result.students_used.forEach((serverStudent, i) => {
-                    // Match by name or index. Since order is preserved in Python list, index is safe if list didn't change
-                    // But names are safer.
+                result.students_used.forEach((serverStudent) => {
                     const localStudent = students.find(s => s.name === serverStudent.name);
                     if (localStudent) {
                         localStudent.target = serverStudent.target;
                     }
                 });
-                renderStudents(); // Reflect new counts in UI
+                renderStudents();
             }
 
             displaySchedule(result);
@@ -318,7 +308,6 @@ function displaySchedule(result) {
     const schedule = result.schedule;
     const stats = result.stats;
 
-    // Simple Stats for faculty
     statsContainer.innerHTML = `
         <div class="stat-item">
             <span class="stat-label">Success</span>
@@ -334,7 +323,6 @@ function displaySchedule(result) {
         </div>
     `;
 
-    // Header
     headerEl.innerHTML = `
         <tr>
             <th>Student Name</th>
@@ -343,7 +331,6 @@ function displaySchedule(result) {
         </tr>
     `;
 
-    // Body
     const virtualNames = new Set(virtualInterviewers);
     bodyEl.innerHTML = Object.entries(schedule).map(([name, slots]) => {
         const total = slots.filter(s => s).length;
@@ -377,7 +364,6 @@ function regenerate() {
     generateSchedule();
 }
 
-// Export
 async function exportCSV() {
     if (!currentSchedule) return;
 
@@ -408,4 +394,88 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Modal Controller
+const Modal = {
+    el: document.getElementById('message-modal'),
+    title: document.getElementById('modal-title'),
+    message: document.getElementById('modal-message'),
+    inputContainer: document.getElementById('modal-input-container'),
+    input: document.getElementById('modal-input'),
+    actions: document.getElementById('modal-actions'),
+
+    show: function (title, message, type = 'info', hasInput = false) {
+        this.el.style.display = 'flex';
+        this.el.querySelector('.modal-content').className = `modal-content ${type}`;
+        this.title.innerHTML = title;
+        this.message.innerHTML = message;
+
+        if (hasInput) {
+            this.inputContainer.style.display = 'block';
+            this.input.value = '';
+            setTimeout(() => this.input.focus(), 100);
+        } else {
+            this.inputContainer.style.display = 'none';
+        }
+    },
+
+    hide: function () {
+        this.el.style.display = 'none';
+    }
+};
+
+function showMessage(title, message, type = 'info') {
+    return new Promise((resolve) => {
+        Modal.show(title, message, type);
+        Modal.actions.innerHTML = `
+            <button class="btn btn-primary" id="modal-ok-btn">OK</button>
+        `;
+        document.getElementById('modal-ok-btn').onclick = () => {
+            Modal.hide();
+            resolve();
+        };
+    });
+}
+
+function showConfirm(title, message, type = 'warning') {
+    return new Promise((resolve) => {
+        Modal.show(title, message, type);
+        Modal.actions.innerHTML = `
+            <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+            <button class="btn btn-primary" id="modal-confirm-btn">Confirm</button>
+        `;
+        document.getElementById('modal-cancel-btn').onclick = () => {
+            Modal.hide();
+            resolve(false);
+        };
+        document.getElementById('modal-confirm-btn').onclick = () => {
+            Modal.hide();
+            resolve(true);
+        };
+    });
+}
+
+function showPrompt(title, message) {
+    return new Promise((resolve) => {
+        Modal.show(title, message, 'info', true);
+        Modal.actions.innerHTML = `
+            <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+            <button class="btn btn-primary" id="modal-ok-btn">OK</button>
+        `;
+
+        const finish = (val) => {
+            Modal.hide();
+            resolve(val);
+        };
+
+        document.getElementById('modal-cancel-btn').onclick = () => finish(null);
+        document.getElementById('modal-ok-btn').onclick = () => finish(Modal.input.value);
+
+        // Enter key to submit
+        Modal.input.onkeydown = (e) => {
+            if (e.key === 'Enter') finish(Modal.input.value);
+            if (e.key === 'Escape') finish(null);
+        };
+    });
 }
