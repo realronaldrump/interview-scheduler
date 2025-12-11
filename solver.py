@@ -137,6 +137,23 @@ def solve_schedule(
                 schedule[s['name']].append(assigned)
         
         # Calculate stats
+        interviewer_schedule = {}
+        for i in range(num_interviewers):
+            inv_name = interviewers[i]['name']
+            interviewer_schedule[inv_name] = []
+            for t in range(num_slots):
+                # Check for break using the break variable
+                if solver.Value(breaks[i, t]) == 1:
+                    interviewer_schedule[inv_name].append("BREAK")
+                else:
+                    # Check for student
+                    found_student = None
+                    for s_idx, s in enumerate(students):
+                        if solver.Value(x[s_idx, t, i]) == 1:
+                            found_student = s['name']
+                            break
+                    interviewer_schedule[inv_name].append(found_student)
+
         stats = {
             'total_interviews': sum(1 for s in schedule.values() for slot in s if slot),
             'capacity': total_capacity,
@@ -148,6 +165,7 @@ def solve_schedule(
         return {
             'success': True,
             'schedule': schedule,
+            'interviewer_schedule': interviewer_schedule,
             'error': None,
             'stats': stats
         }

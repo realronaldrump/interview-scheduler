@@ -6,7 +6,17 @@ from flask import Flask, render_template, request, jsonify, Response
 import csv
 import io
 import random
+import string
 from solver import solve_schedule, validate_schedule
+
+def get_table_letter(index):
+    """Generate A, B, C... AA, AB..."""
+    # Simple implementation for typical class sizes (A-Z)
+    if index < 26:
+        return string.ascii_uppercase[index]
+    else:
+        return f"{string.ascii_uppercase[index // 26 - 1]}{string.ascii_uppercase[index % 26]}"
+
 
 app = Flask(__name__)
 
@@ -50,12 +60,27 @@ def solve():
             'target': int(s.get('target', 6))
         })
     
-    # Parse interviewers
+    # Parse interviewers & Assign IDs
     interviewers = []
+    
+    # Separate input to assign IDs primarily based on order, but usually user separates them
+    # Actually, let's assign IDs as we process them, maintaining separate counters
+    phys_count = 0
+    virt_count = 0
+    
     for inv in data.get('interviewers', []):
+        is_virtual = inv.get('is_virtual', False)
+        if is_virtual:
+            virt_count += 1
+            assigned_id = f"Z-{virt_count}"
+        else:
+            assigned_id = get_table_letter(phys_count)
+            phys_count += 1
+            
         interviewers.append({
             'name': inv['name'],
-            'is_virtual': inv.get('is_virtual', False)
+            'is_virtual': is_virtual,
+            'id': assigned_id
         })
     
     num_slots = int(data.get('num_slots', 13))
@@ -123,6 +148,37 @@ def solve():
         result['seed_used'] = seed
         # Return the modified student configuration so UI can update
         result['students_used'] = students
+        
+        # Process Interviewer Assignments (Table IDs & Breaks)
+        inv_assignments = []
+        inv_schedule = result.get('interviewer_schedule', {})
+        
+        # Create a lookup for interviewer objects
+        inv_map = {i['name']: i for i in interviewers}
+        
+        for name, slots in inv_schedule.items():
+            # Find break slot (1-based)
+            break_slot = "None"
+            if "BREAK" in slots:
+                # Add 1 because slots are 0-indexed
+                break_slot = slots.index("BREAK") + 1
+            
+            inv_obj = inv_map.get(name)
+            if inv_obj:
+                inv_assignments.append({
+                    'name': name,
+                    'id': inv_obj['id'],
+                    'is_virtual': inv_obj['is_virtual'],
+                    'break_slot': break_slot
+                })
+        
+        # Sort by ID for display
+        # We want A, B, C... then Z-1, Z-2...
+        # A simple sort on ID string works: 'A' < 'Z'
+        inv_assignments.sort(key=lambda x: x['id'])
+        
+        result['interviewer_assignments'] = inv_assignments
+
     
     return jsonify(result)
 

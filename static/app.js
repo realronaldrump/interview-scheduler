@@ -9,6 +9,8 @@ let physicalInterviewers = [];
 let virtualInterviewers = [];
 let currentSchedule = null;
 let lastSeedUsed = null;
+let lastResult = null;
+let viewMode = 'name';
 
 // Initialize
 function initializeApp(defaultStudents, defaultPhysical, defaultVirtual) {
@@ -275,6 +277,7 @@ async function generateSchedule(autoBalance = false) {
         if (result.success) {
             currentSchedule = result.schedule;
             lastSeedUsed = result.seed_used;
+            lastResult = result;
 
             if (result.students_used) {
                 result.students_used.forEach((serverStudent) => {
@@ -298,15 +301,40 @@ async function generateSchedule(autoBalance = false) {
     }
 }
 
+function updateViewMode() {
+    const radios = document.getElementsByName('view-mode');
+    for (const radio of radios) {
+        if (radio.checked) {
+            viewMode = radio.value;
+            break;
+        }
+    }
+    if (lastResult) {
+        displaySchedule(lastResult);
+    }
+}
+
 function displaySchedule(result) {
     const panel = document.getElementById('results-panel');
     const statsContainer = document.getElementById('results-stats');
     const headerEl = document.getElementById('schedule-header');
     const bodyEl = document.getElementById('schedule-body');
 
+    // New Assignments Table Elements
+    const assignmentsBody = document.getElementById('assignments-body');
+
     const numSlots = parseInt(document.getElementById('num-slots').value) || 13;
     const schedule = result.schedule;
     const stats = result.stats;
+    const invAssignments = result.interviewer_assignments || [];
+
+    // Create lookup for Name -> ID if needed
+    const nameToId = {};
+    if (viewMode === 'id') {
+        invAssignments.forEach(inv => {
+            nameToId[inv.name] = inv.id;
+        });
+    }
 
     statsContainer.innerHTML = `
         <div class="stat-item">
@@ -337,7 +365,14 @@ function displaySchedule(result) {
         const cells = slots.map(s => {
             if (!s) return '<td class="wait">Break</td>';
             const isVirtual = virtualNames.has(s);
-            return `<td class="${isVirtual ? 'virtual' : 'physical'}">${escapeHtml(s)}</td>`;
+
+            // Determine display text based on viewMode
+            let displayText = escapeHtml(s);
+            if (viewMode === 'id' && nameToId[s]) {
+                displayText = escapeHtml(nameToId[s]);
+            }
+
+            return `<td class="${isVirtual ? 'virtual' : 'physical'}">${displayText}</td>`;
         }).join('');
         return `
             <tr>
@@ -347,6 +382,19 @@ function displaySchedule(result) {
             </tr>
         `;
     }).join('');
+
+    // Render Assignments Table
+    if (invAssignments.length > 0) {
+        assignmentsBody.innerHTML = invAssignments.map(inv => `
+            <tr>
+                <td>${escapeHtml(inv.name)}</td>
+                <td><strong>${escapeHtml(inv.id)}</strong></td>
+                <td>${inv.break_slot === 'None' ? '-' : 'Slot ' + inv.break_slot}</td>
+            </tr>
+        `).join('');
+    } else {
+        assignmentsBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#999;">No assignment data available.</td></tr>';
+    }
 
     panel.style.display = 'block';
     panel.scrollIntoView({ behavior: 'smooth' });

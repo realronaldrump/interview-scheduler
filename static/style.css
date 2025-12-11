@@ -747,3 +747,75 @@ body {
     line-height: 1.6;
     margin-bottom: 20px;
 }
+
+/* Simple Table for Assignments */
+.simple-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+}
+
+.simple-table th,
+.simple-table td {
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.simple-table th {
+    background: #f0f7f4;
+    color: var(--baylor-green);
+    font-weight: 600;
+}
+
+.simple-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* View Toggle */
+.view-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 16px;
+    background: #f5f5f5;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    font-size: 13px;
+}
+
+.view-toggle span {
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-right: 4px;
+}
+
+.view-toggle input[type="radio"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.view-toggle label {
+    cursor: pointer;
+    color: var(--text-primary);
+    padding-right: 4px;
+}
+
+.view-toggle input[type="radio"]:checked+label {
+    color: var(--baylor-green);
+    font-weight: 600;
+}
+
+@media print {
+    .view-toggle {
+        display: none !important;
+    }
+
+    .interviewer-assignments {
+        page-break-before: always;
+        margin-top: 20px;
+    }
+}

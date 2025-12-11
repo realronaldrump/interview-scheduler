@@ -131,6 +131,14 @@
                 <div class="results-header">
                     <h2>Generated Schedule</h2>
                     <div class="results-actions">
+                        <div class="view-toggle">
+                            <span>Display:</span>
+                            <input type="radio" id="view-name" name="view-mode" value="name" checked
+                                onchange="updateViewMode()">
+                            <label for="view-name">Names</label>
+                            <input type="radio" id="view-id" name="view-mode" value="id" onchange="updateViewMode()">
+                            <label for="view-id">Table IDs</label>
+                        </div>
                         <button class="btn btn-sm btn-primary" onclick="exportCSV()">Download CSV</button>
                         <button class="btn btn-sm btn-secondary" onclick="window.print()">Print</button>
                         <button class="btn btn-sm btn-secondary" onclick="regenerate()">Generate Another</button>
@@ -143,6 +151,22 @@
                     <table class="schedule-table" id="schedule-table">
                         <thead id="schedule-header"></thead>
                         <tbody id="schedule-body"></tbody>
+                    </table>
+                </div>
+
+                <div class="interviewer-assignments" style="margin-top: 30px; page-break-before: always;">
+                    <h3>Interviewer Table Assignments & Breaks</h3>
+                    <table class="simple-table" id="assignments-table">
+                        <thead>
+                            <tr>
+                                <th>Interviewer Name</th>
+                                <th>Assigned Table / ID</th>
+                                <th>Break Slot</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assignments-body">
+                            <!-- Filled by JS -->
+                        </tbody>
                     </table>
                 </div>
             </section>
