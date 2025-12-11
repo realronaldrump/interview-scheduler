@@ -555,7 +555,7 @@ async function exportCSV() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'interview_schedule.xlsx';
+        a.download = 'Fall 2025 Mock Interview Rotation Schedule.xlsx';
         a.click();
         URL.revokeObjectURL(url);
     } catch (err) {

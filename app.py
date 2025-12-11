@@ -307,7 +307,7 @@ def export_schedule():
     return Response(
         output.getvalue(),
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        headers={'Content-Disposition': 'attachment; filename=interview_schedule.xlsx'}
+        headers={'Content-Disposition': 'attachment; filename=Fall 2025 Mock Interview Rotation Schedule.xlsx'}
     )
 
 
