@@ -63,6 +63,9 @@ function renderStudents() {
         let html = '';
         sortedTargets.forEach(target => {
             const groupStudents = groups[target];
+            // Sort within group by last name
+            groupStudents.sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)));
+
             html += `
                 <div class="student-group">
                     <div class="group-header">
@@ -78,11 +81,22 @@ function renderStudents() {
         container.innerHTML = html;
         container.className = 'student-list grouped';
     } else {
-        container.innerHTML = students.map((s, i) => renderStudentItem(i, s.name, s.target)).join('');
+        // Create a copy with original indices to sort
+        const indexedStudents = students.map((s, i) => ({ ...s, originalIndex: i }));
+        // Sort by last name
+        indexedStudents.sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)));
+
+        container.innerHTML = indexedStudents.map(s => renderStudentItem(s.originalIndex, s.name, s.target)).join('');
         container.className = 'student-list';
     }
 
     updateStats();
+}
+
+function getLastName(fullName) {
+    if (!fullName) return '';
+    const parts = fullName.trim().split(/\s+/);
+    return parts.length > 0 ? parts[parts.length - 1].toLowerCase() : '';
 }
 
 function updateStudentSort() {
