@@ -53,10 +53,11 @@ body {
 .app-header {
     background: var(--baylor-green);
     color: white;
-    padding: 20px 24px;
+    padding: 24px 24px;
     border-radius: var(--radius-lg);
     margin-bottom: 24px;
     box-shadow: var(--shadow-md);
+    text-align: center;
 }
 
 .app-header h1 {
@@ -1103,6 +1104,7 @@ body {
 .event-selector {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 12px;
     margin-top: 16px;
     padding-top: 16px;
