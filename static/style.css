@@ -994,3 +994,27 @@ body {
     flex-wrap: wrap;
     gap: 8px;
 }
+
+/* Vertical Sort Layout - columns flow top-to-bottom */
+.student-list.vertical-sort {
+    display: block;
+    column-count: 3;
+    column-gap: 12px;
+}
+
+.student-list.vertical-sort .student-item {
+    break-inside: avoid;
+    margin-bottom: 8px;
+}
+
+@media (max-width: 900px) {
+    .student-list.vertical-sort {
+        column-count: 2;
+    }
+}
+
+@media (max-width: 600px) {
+    .student-list.vertical-sort {
+        column-count: 1;
+    }
+}

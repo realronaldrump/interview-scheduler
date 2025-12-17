@@ -11,7 +11,7 @@ let currentSchedule = null;
 let lastSeedUsed = null;
 let lastResult = null;
 let viewMode = 'name';
-let studentSortMode = 'added';
+let studentSortMode = 'last';
 
 // Initialize
 function initializeApp(defaultStudents, defaultPhysical, defaultVirtual) {
@@ -83,11 +83,15 @@ function renderStudents() {
     } else {
         // Create a copy with original indices to sort
         const indexedStudents = students.map((s, i) => ({ ...s, originalIndex: i }));
-        // Sort by last name
-        indexedStudents.sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)));
+        // Sort by first or last name
+        if (studentSortMode === 'first') {
+            indexedStudents.sort((a, b) => getFirstName(a.name).localeCompare(getFirstName(b.name)));
+        } else {
+            indexedStudents.sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)));
+        }
 
         container.innerHTML = indexedStudents.map(s => renderStudentItem(s.originalIndex, s.name, s.target)).join('');
-        container.className = 'student-list';
+        container.className = 'student-list vertical-sort';
     }
 
     updateStats();
@@ -97,6 +101,12 @@ function getLastName(fullName) {
     if (!fullName) return '';
     const parts = fullName.trim().split(/\s+/);
     return parts.length > 0 ? parts[parts.length - 1].toLowerCase() : '';
+}
+
+function getFirstName(fullName) {
+    if (!fullName) return '';
+    const parts = fullName.trim().split(/\s+/);
+    return parts.length > 0 ? parts[0].toLowerCase() : '';
 }
 
 function updateStudentSort() {

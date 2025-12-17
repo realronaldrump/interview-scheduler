@@ -42,9 +42,12 @@
                     <div class="list-controls">
                         <span class="control-label">Sort by:</span>
                         <div class="view-toggle">
-                            <input type="radio" id="sort-added" name="student-sort" value="added" checked
+                            <input type="radio" id="sort-last" name="student-sort" value="last" checked
                                 onchange="updateStudentSort()">
-                            <label for="sort-added">Alphabetical</label>
+                            <label for="sort-last">Last Name</label>
+                            <input type="radio" id="sort-first" name="student-sort" value="first"
+                                onchange="updateStudentSort()">
+                            <label for="sort-first">First Name</label>
                             <input type="radio" id="sort-count" name="student-sort" value="count"
                                 onchange="updateStudentSort()">
                             <label for="sort-count">Interview Count</label>
