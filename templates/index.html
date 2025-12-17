@@ -17,9 +17,28 @@
         <header class="app-header">
             <h1>Interview Scheduler</h1>
             <p class="subtitle">Mock Interview Assignment Tool</p>
+
+            <!-- Event Selector -->
+            <div class="event-selector">
+                <select id="event-select" onchange="onEventChange()">
+                    <option value="">-- Select an Event --</option>
+                </select>
+                <button class="btn btn-sm btn-primary" onclick="showCreateEventModal()">+ New Event</button>
+                <button class="btn btn-sm btn-secondary" id="edit-event-btn" onclick="showEditEventModal()"
+                    style="display: none;">Edit Event</button>
+            </div>
         </header>
 
-        <main class="main-content">
+        <!-- No Event Selected State -->
+        <div class="no-event-message" id="no-event-message">
+            <div class="empty-state">
+                <h2>Welcome to Interview Scheduler</h2>
+                <p>Select an existing event from the dropdown above, or create a new one to get started.</p>
+                <button class="btn btn-gold btn-lg" onclick="showCreateEventModal()">Create New Event</button>
+            </div>
+        </div>
+
+        <main class="main-content" id="main-content" style="display: none;">
             <!-- Step 1: Students -->
             <section class="config-panel">
                 <div class="config-section">
@@ -187,7 +206,7 @@
             <!-- Results Panel -->
             <section class="results-panel" id="results-panel" style="display: none;">
                 <div class="results-header">
-                    <h2>Fall 2025 Mock Interview Rotation Schedule</h2>
+                    <h2 id="results-title">Interview Schedule</h2>
                     <div class="results-actions">
                         <div class="view-toggle">
                             <span>Display:</span>
@@ -253,6 +272,27 @@
         </div>
     </div>
 
+    <!-- Create/Edit Event Modal -->
+    <div class="modal" id="event-modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="event-modal-title">Create New Event</h3>
+            <div class="form-group">
+                <label for="event-name-input">Event Name</label>
+                <input type="text" id="event-name-input" placeholder="e.g., Fall 2025 Mock Interviews">
+            </div>
+            <div class="form-group">
+                <label for="event-year-input">Year</label>
+                <input type="number" id="event-year-input" value="2025" min="2020" max="2050">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeEventModal()">Cancel</button>
+                <button class="btn btn-danger" id="delete-event-btn" onclick="deleteCurrentEvent()"
+                    style="display: none;">Delete Event</button>
+                <button class="btn btn-primary" id="event-modal-submit" onclick="submitEventModal()">Create</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Generic Message Modal -->
     <div class="modal" id="message-modal" style="display: none;">
         <div class="modal-content">
@@ -269,12 +309,8 @@
 
     <script src="/static/app.js"></script>
     <script>
-        // Initialize with default data
-        const defaultStudents = {{ default_students | tojson }};
-        const defaultPhysical = {{ default_physical | tojson }};
-        const defaultVirtual = {{ default_virtual | tojson }};
-
-        initializeApp(defaultStudents, defaultPhysical, defaultVirtual);
+        // Initialize the app (load events)
+        initializeApp();
     </script>
 </body>
 

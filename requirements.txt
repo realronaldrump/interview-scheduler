@@ -2,3 +2,6 @@ Flask
 ortools
 pandas
 xlsxwriter
+Flask-SQLAlchemy
+psycopg2-binary
+python-dotenv

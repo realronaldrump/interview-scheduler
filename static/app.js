@@ -1,43 +1,268 @@
 /**
  * Interview Scheduler - Frontend Application
  * Baylor University Style - Faculty Friendly Version
+ * With Vercel Postgres Persistence
  */
 
+// =============================================================================
 // State
-let students = [];
-let physicalInterviewers = [];
-let virtualInterviewers = [];
+// =============================================================================
+
+let currentEventId = null;
+let currentEvent = null;
+let students = [];  // Array of {id, name, target} - id is from database
+let physicalInterviewers = [];  // Array of {id, name}
+let virtualInterviewers = [];  // Array of {id, name}
 let currentSchedule = null;
 let lastSeedUsed = null;
 let lastResult = null;
 let viewMode = 'name';
 let studentSortMode = 'alpha';
-let nameSortField = 'last';
 
-// Initialize
-function initializeApp(defaultStudents, defaultPhysical, defaultVirtual) {
-    // Load students with default target
-    const defaultTarget = parseInt(document.getElementById('default-target').value) || 6;
-    students = defaultStudents.map(name => ({ name, target: defaultTarget }));
+// Debounce timers for auto-save
+let studentSaveTimeout = null;
+let interviewerSaveTimeout = null;
 
-    physicalInterviewers = [...defaultPhysical];
-    virtualInterviewers = [...defaultVirtual];
+// =============================================================================
+// Initialization
+// =============================================================================
 
-    renderStudents();
-    renderInterviewers();
+async function initializeApp() {
+    await loadEvents();
     updateStats();
     updateVirtualGuarantee();
 }
 
+async function loadEvents() {
+    try {
+        const response = await fetch('/api/events');
+        const events = await response.json();
+
+        const select = document.getElementById('event-select');
+        select.innerHTML = '<option value="">-- Select an Event --</option>';
+
+        events.forEach(event => {
+            const option = document.createElement('option');
+            option.value = event.id;
+            option.textContent = `${event.name} (${event.year})`;
+            if (event.is_active) {
+                option.textContent += ' ★';
+            }
+            select.appendChild(option);
+        });
+
+        // If we had a previously selected event, try to restore it
+        if (currentEventId) {
+            select.value = currentEventId;
+        }
+    } catch (err) {
+        console.error('Failed to load events:', err);
+    }
+}
+
+async function onEventChange() {
+    const select = document.getElementById('event-select');
+    const eventId = select.value;
+
+    if (!eventId) {
+        currentEventId = null;
+        currentEvent = null;
+        document.getElementById('main-content').style.display = 'none';
+        document.getElementById('no-event-message').style.display = 'block';
+        document.getElementById('edit-event-btn').style.display = 'none';
+        document.getElementById('results-panel').style.display = 'none';
+        return;
+    }
+
+    currentEventId = parseInt(eventId);
+    await loadEventData(currentEventId);
+
+    document.getElementById('no-event-message').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+    document.getElementById('edit-event-btn').style.display = 'inline-block';
+}
+
+async function loadEventData(eventId) {
+    try {
+        const response = await fetch(`/api/events/${eventId}`);
+        const data = await response.json();
+
+        currentEvent = data;
+
+        // Load students
+        students = data.students.map(s => ({
+            id: s.id,
+            name: s.name,
+            target: s.target
+        }));
+
+        // Split interviewers by type
+        physicalInterviewers = data.interviewers
+            .filter(i => !i.is_virtual)
+            .map(i => ({ id: i.id, name: i.name }));
+
+        virtualInterviewers = data.interviewers
+            .filter(i => i.is_virtual)
+            .map(i => ({ id: i.id, name: i.name }));
+
+        renderStudents();
+        renderInterviewers();
+        updateStats();
+
+        // Update results title
+        document.getElementById('results-title').textContent = data.name;
+
+        // Load saved schedule if exists
+        if (data.schedule) {
+            currentSchedule = data.schedule.schedule;
+            lastSeedUsed = data.schedule.seed_used;
+            lastResult = {
+                schedule: data.schedule.schedule,
+                interviewer_schedule: data.schedule.interviewer_schedule,
+                interviewer_assignments: data.schedule.interviewer_assignments,
+                seed_used: data.schedule.seed_used,
+                config: data.schedule.config
+            };
+
+            // Restore config if available
+            if (data.schedule.config) {
+                const config = data.schedule.config;
+                if (config.num_slots) document.getElementById('num-slots').value = config.num_slots;
+                if (config.min_virtual) document.getElementById('min-virtual').value = config.min_virtual;
+                if (config.max_virtual) document.getElementById('max-virtual').value = config.max_virtual;
+            }
+
+            displaySchedule(lastResult);
+        } else {
+            currentSchedule = null;
+            lastResult = null;
+            document.getElementById('results-panel').style.display = 'none';
+        }
+
+    } catch (err) {
+        console.error('Failed to load event data:', err);
+        showError('Failed to load event data: ' + err.message);
+    }
+}
+
+
+// =============================================================================
+// Event Management
+// =============================================================================
+
+function showCreateEventModal() {
+    document.getElementById('event-modal-title').textContent = 'Create New Event';
+    document.getElementById('event-name-input').value = '';
+    document.getElementById('event-year-input').value = new Date().getFullYear();
+    document.getElementById('event-modal-submit').textContent = 'Create';
+    document.getElementById('event-modal-submit').onclick = createEvent;
+    document.getElementById('delete-event-btn').style.display = 'none';
+    document.getElementById('event-modal').style.display = 'flex';
+    document.getElementById('event-name-input').focus();
+}
+
+function showEditEventModal() {
+    if (!currentEvent) return;
+
+    document.getElementById('event-modal-title').textContent = 'Edit Event';
+    document.getElementById('event-name-input').value = currentEvent.name;
+    document.getElementById('event-year-input').value = currentEvent.year;
+    document.getElementById('event-modal-submit').textContent = 'Save';
+    document.getElementById('event-modal-submit').onclick = updateEvent;
+    document.getElementById('delete-event-btn').style.display = 'inline-block';
+    document.getElementById('event-modal').style.display = 'flex';
+}
+
+function closeEventModal() {
+    document.getElementById('event-modal').style.display = 'none';
+}
+
+async function createEvent() {
+    const name = document.getElementById('event-name-input').value.trim();
+    const year = parseInt(document.getElementById('event-year-input').value);
+
+    if (!name) {
+        showMessage('Missing Name', 'Please enter an event name.', 'warning');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, year })
+        });
+
+        const newEvent = await response.json();
+        closeEventModal();
+
+        // Reload events and select the new one
+        await loadEvents();
+        document.getElementById('event-select').value = newEvent.id;
+        await onEventChange();
+
+    } catch (err) {
+        showError('Failed to create event: ' + err.message);
+    }
+}
+
+async function updateEvent() {
+    if (!currentEventId) return;
+
+    const name = document.getElementById('event-name-input').value.trim();
+    const year = parseInt(document.getElementById('event-year-input').value);
+
+    try {
+        await fetch(`/api/events/${currentEventId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, year })
+        });
+
+        closeEventModal();
+        await loadEvents();
+        await loadEventData(currentEventId);
+
+    } catch (err) {
+        showError('Failed to update event: ' + err.message);
+    }
+}
+
+async function deleteCurrentEvent() {
+    if (!currentEventId) return;
+
+    if (await showConfirm(
+        'Delete Event',
+        `Are you sure you want to delete "${currentEvent.name}"?<br><br>This will permanently delete all students, interviewers, and schedules associated with this event.`,
+        'warning'
+    )) {
+        try {
+            await fetch(`/api/events/${currentEventId}`, { method: 'DELETE' });
+            closeEventModal();
+            currentEventId = null;
+            currentEvent = null;
+            await loadEvents();
+            document.getElementById('event-select').value = '';
+            onEventChange();
+        } catch (err) {
+            showError('Failed to delete event: ' + err.message);
+        }
+    }
+}
+
+
+// =============================================================================
 // Student Management
-function renderStudentItem(index, name, target) {
+// =============================================================================
+
+function renderStudentItem(student) {
     return `
-        <div class="student-item" data-index="${index}">
-            <input type="text" value="${escapeHtml(name)}" 
-                   onchange="updateStudentName(${index}, this.value)" placeholder="Student Name">
-            <input type="number" value="${target}" min="1" max="13"
-                   onchange="updateStudentTarget(${index}, this.value)" title="Number of interviews">
-            <button class="remove-btn" onclick="removeStudent(${index})" title="Remove student">×</button>
+        <div class="student-item" data-id="${student.id}">
+            <input type="text" value="${escapeHtml(student.name)}" 
+                   onchange="updateStudentName(${student.id}, this.value)" placeholder="Student Name">
+            <input type="number" value="${student.target}" min="1" max="13"
+                   onchange="updateStudentTarget(${student.id}, this.value)" title="Number of interviews">
+            <button class="remove-btn" onclick="removeStudent(${student.id})" title="Remove student">×</button>
         </div>
     `;
 }
@@ -53,10 +278,10 @@ function renderStudents() {
 
     if (studentSortMode === 'count') {
         const groups = {};
-        students.forEach((s, i) => {
+        students.forEach(s => {
             const t = s.target;
             if (!groups[t]) groups[t] = [];
-            groups[t].push({ ...s, originalIndex: i });
+            groups[t].push(s);
         });
 
         const sortedTargets = Object.keys(groups).map(Number).sort((a, b) => b - a);
@@ -71,10 +296,10 @@ function renderStudents() {
                 <div class="student-group">
                     <div class="group-header">
                         <span class="header-title">${target} Interviews</span>
-                        <span class="count-badge">${groupStudents.length} student${groupStudents.length !== 1 ? 's' : ''}</span>
+                        <span class="count-badge">${groupStudents.length}</span>
                     </div>
-                    <div class="group-content vertical-columns">
-                        ${groupStudents.map(s => renderStudentItem(s.originalIndex, s.name, s.target)).join('')}
+                    <div class="group-content">
+                        ${groupStudents.map(s => renderStudentItem(s)).join('')}
                     </div>
                 </div>
             `;
@@ -82,17 +307,10 @@ function renderStudents() {
         container.innerHTML = html;
         container.className = 'student-list grouped';
     } else {
-        // Create a copy with original indices to sort
-        const indexedStudents = students.map((s, i) => ({ ...s, originalIndex: i }));
-        // Sort by first or last name based on dropdown
-        if (nameSortField === 'first') {
-            indexedStudents.sort((a, b) => getFirstName(a.name).localeCompare(getFirstName(b.name)));
-        } else {
-            indexedStudents.sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)));
-        }
-
-        container.innerHTML = indexedStudents.map(s => renderStudentItem(s.originalIndex, s.name, s.target)).join('');
-        container.className = 'student-list vertical-sort';
+        // Sort by name
+        const sortedStudents = [...students].sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)));
+        container.innerHTML = sortedStudents.map(s => renderStudentItem(s)).join('');
+        container.className = 'student-list';
     }
 
     updateStats();
@@ -104,12 +322,6 @@ function getLastName(fullName) {
     return parts.length > 0 ? parts[parts.length - 1].toLowerCase() : '';
 }
 
-function getFirstName(fullName) {
-    if (!fullName) return '';
-    const parts = fullName.trim().split(/\s+/);
-    return parts.length > 0 ? parts[0].toLowerCase() : '';
-}
-
 function updateStudentSort() {
     const radios = document.getElementsByName('student-sort');
     for (const radio of radios) {
@@ -118,54 +330,106 @@ function updateStudentSort() {
             break;
         }
     }
-
-    // Get name sort field from dropdown
-    const nameSortSelect = document.getElementById('name-sort-field');
-    if (nameSortSelect) {
-        nameSortField = nameSortSelect.value;
-    }
-
-    // Show/hide dropdown based on mode
-    const dropdown = document.getElementById('name-sort-dropdown');
-    if (dropdown) {
-        dropdown.style.display = studentSortMode === 'alpha' ? 'flex' : 'none';
-    }
-
     renderStudents();
 }
 
-function addStudent() {
+async function addStudent() {
+    if (!currentEventId) return;
+
     const defaultTarget = parseInt(document.getElementById('default-target').value) || 6;
-    students.push({ name: 'New Student', target: defaultTarget });
-    renderStudents();
 
-    // Scroll to bottom of list
-    const list = document.getElementById('student-list');
-    list.scrollTop = list.scrollHeight;
+    try {
+        const response = await fetch(`/api/events/${currentEventId}/students`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'New Student', target: defaultTarget })
+        });
+
+        const newStudent = await response.json();
+        students.push({
+            id: newStudent.id,
+            name: newStudent.name,
+            target: newStudent.target
+        });
+
+        renderStudents();
+
+        // Scroll to bottom and focus the new input
+        const list = document.getElementById('student-list');
+        list.scrollTop = list.scrollHeight;
+
+    } catch (err) {
+        showError('Failed to add student: ' + err.message);
+    }
 }
 
-function removeStudent(index) {
-    students.splice(index, 1);
-    renderStudents();
+async function removeStudent(studentId) {
+    if (!currentEventId) return;
+
+    try {
+        await fetch(`/api/events/${currentEventId}/students/${studentId}`, { method: 'DELETE' });
+        students = students.filter(s => s.id !== studentId);
+        renderStudents();
+    } catch (err) {
+        showError('Failed to remove student: ' + err.message);
+    }
 }
 
 async function clearStudents() {
+    if (!currentEventId) return;
+
     if (await showConfirm('Clear All Students', 'Are you sure you want to remove all students? This cannot be undone.', 'warning')) {
-        students = [];
-        renderStudents();
+        try {
+            await fetch(`/api/events/${currentEventId}/students`, { method: 'DELETE' });
+            students = [];
+            renderStudents();
+        } catch (err) {
+            showError('Failed to clear students: ' + err.message);
+        }
     }
 }
 
-function updateStudentName(index, name) {
-    students[index].name = name;
+function updateStudentName(studentId, name) {
+    const student = students.find(s => s.id === studentId);
+    if (student) {
+        student.name = name;
+        debouncedSaveStudent(studentId);
+    }
 }
 
-function updateStudentTarget(index, target) {
-    students[index].target = parseInt(target) || 6;
-    if (studentSortMode === 'count') {
-        renderStudents();
-    } else {
-        updateStats();
+function updateStudentTarget(studentId, target) {
+    const student = students.find(s => s.id === studentId);
+    if (student) {
+        student.target = parseInt(target) || 6;
+        debouncedSaveStudent(studentId);
+        if (studentSortMode === 'count') {
+            renderStudents();
+        } else {
+            updateStats();
+        }
+    }
+}
+
+function debouncedSaveStudent(studentId) {
+    // Debounce API calls
+    if (studentSaveTimeout) clearTimeout(studentSaveTimeout);
+    studentSaveTimeout = setTimeout(() => saveStudent(studentId), 500);
+}
+
+async function saveStudent(studentId) {
+    if (!currentEventId) return;
+
+    const student = students.find(s => s.id === studentId);
+    if (!student) return;
+
+    try {
+        await fetch(`/api/events/${currentEventId}/students/${studentId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: student.name, target: student.target })
+        });
+    } catch (err) {
+        console.error('Failed to save student:', err);
     }
 }
 
@@ -183,7 +447,9 @@ function closeBulkModal() {
     document.getElementById('bulk-modal').style.display = 'none';
 }
 
-function processBulkAdd() {
+async function processBulkAdd() {
+    if (!currentEventId) return;
+
     const input = document.getElementById('bulk-input').value;
     const names = input.split('\n')
         .map(n => n.trim())
@@ -195,15 +461,32 @@ function processBulkAdd() {
     }
 
     const defaultTarget = parseInt(document.getElementById('default-target').value) || 6;
-    names.forEach(name => {
-        students.push({ name, target: defaultTarget });
-    });
 
-    renderStudents();
-    closeBulkModal();
+    try {
+        const response = await fetch(`/api/events/${currentEventId}/students/bulk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ students: names, default_target: defaultTarget })
+        });
+
+        const newStudents = await response.json();
+        newStudents.forEach(s => {
+            students.push({ id: s.id, name: s.name, target: s.target });
+        });
+
+        renderStudents();
+        closeBulkModal();
+
+    } catch (err) {
+        showError('Failed to add students: ' + err.message);
+    }
 }
 
+
+// =============================================================================
 // Interviewer Management
+// =============================================================================
+
 function renderInterviewers() {
     const physContainer = document.getElementById('physical-interviewer-list');
     const virtContainer = document.getElementById('virtual-interviewer-list');
@@ -211,14 +494,12 @@ function renderInterviewers() {
     if (physicalInterviewers.length === 0) {
         physContainer.innerHTML = '<div style="color: #999; font-style: italic; font-size: 13px;">No in-person interviewers added.</div>';
     } else {
-        const sortedPhysical = physicalInterviewers
-            .map((name, i) => ({ name, originalIndex: i }))
-            .sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)));
+        const sortedPhysical = [...physicalInterviewers].sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)));
 
         physContainer.innerHTML = sortedPhysical.map(item => `
-            <div class="interviewer-item">
-                <span contenteditable="true" onblur="updateInterviewerName('physical', ${item.originalIndex}, this.innerText)">${escapeHtml(item.name)}</span>
-                <button class="remove-btn" onclick="removeInterviewer('physical', ${item.originalIndex})">×</button>
+            <div class="interviewer-item" data-id="${item.id}">
+                <span contenteditable="true" onblur="updateInterviewerName(${item.id}, false, this.innerText)">${escapeHtml(item.name)}</span>
+                <button class="remove-btn" onclick="removeInterviewer(${item.id}, false)">×</button>
             </div>
         `).join('');
     }
@@ -226,14 +507,12 @@ function renderInterviewers() {
     if (virtualInterviewers.length === 0) {
         virtContainer.innerHTML = '<div style="color: #999; font-style: italic; font-size: 13px;">No virtual interviewers added.</div>';
     } else {
-        const sortedVirtual = virtualInterviewers
-            .map((name, i) => ({ name, originalIndex: i }))
-            .sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)));
+        const sortedVirtual = [...virtualInterviewers].sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)));
 
         virtContainer.innerHTML = sortedVirtual.map(item => `
-            <div class="interviewer-item virtual">
-                <span contenteditable="true" onblur="updateInterviewerName('virtual', ${item.originalIndex}, this.innerText)">${escapeHtml(item.name)}</span>
-                <button class="remove-btn" onclick="removeInterviewer('virtual', ${item.originalIndex})">×</button>
+            <div class="interviewer-item virtual" data-id="${item.id}">
+                <span contenteditable="true" onblur="updateInterviewerName(${item.id}, true, this.innerText)">${escapeHtml(item.name)}</span>
+                <button class="remove-btn" onclick="removeInterviewer(${item.id}, true)">×</button>
             </div>
         `).join('');
     }
@@ -242,37 +521,95 @@ function renderInterviewers() {
 }
 
 async function addInterviewer(isVirtual) {
+    if (!currentEventId) return;
+
     const typeLabel = isVirtual ? 'Virtual' : 'In-Person';
     const name = await showPrompt(`Add ${typeLabel} Interviewer`, `Enter name for the new ${typeLabel.toLowerCase()} interviewer:`);
     if (!name) return;
 
-    if (isVirtual) {
-        virtualInterviewers.push(name);
-    } else {
-        physicalInterviewers.push(name);
-    }
+    try {
+        const response = await fetch(`/api/events/${currentEventId}/interviewers`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, is_virtual: isVirtual })
+        });
 
-    renderInterviewers();
+        const newInterviewer = await response.json();
+
+        if (isVirtual) {
+            virtualInterviewers.push({ id: newInterviewer.id, name: newInterviewer.name });
+        } else {
+            physicalInterviewers.push({ id: newInterviewer.id, name: newInterviewer.name });
+        }
+
+        renderInterviewers();
+
+    } catch (err) {
+        showError('Failed to add interviewer: ' + err.message);
+    }
 }
 
-function updateInterviewerName(type, index, newName) {
-    if (type === 'physical') {
-        physicalInterviewers[index] = newName.trim();
-    } else {
-        virtualInterviewers[index] = newName.trim();
+function updateInterviewerName(interviewerId, isVirtual, newName) {
+    const list = isVirtual ? virtualInterviewers : physicalInterviewers;
+    const interviewer = list.find(i => i.id === interviewerId);
+    if (interviewer) {
+        interviewer.name = newName.trim();
+        debouncedSaveInterviewer(interviewerId);
     }
 }
 
-function removeInterviewer(type, index) {
-    if (type === 'physical') {
-        physicalInterviewers.splice(index, 1);
-    } else {
-        virtualInterviewers.splice(index, 1);
-    }
-    renderInterviewers();
+function debouncedSaveInterviewer(interviewerId) {
+    if (interviewerSaveTimeout) clearTimeout(interviewerSaveTimeout);
+    interviewerSaveTimeout = setTimeout(() => saveInterviewer(interviewerId), 500);
 }
 
+async function saveInterviewer(interviewerId) {
+    if (!currentEventId) return;
+
+    // Find interviewer in either list
+    let interviewer = physicalInterviewers.find(i => i.id === interviewerId);
+    let isVirtual = false;
+    if (!interviewer) {
+        interviewer = virtualInterviewers.find(i => i.id === interviewerId);
+        isVirtual = true;
+    }
+    if (!interviewer) return;
+
+    try {
+        await fetch(`/api/events/${currentEventId}/interviewers/${interviewerId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: interviewer.name, is_virtual: isVirtual })
+        });
+    } catch (err) {
+        console.error('Failed to save interviewer:', err);
+    }
+}
+
+async function removeInterviewer(interviewerId, isVirtual) {
+    if (!currentEventId) return;
+
+    try {
+        await fetch(`/api/events/${currentEventId}/interviewers/${interviewerId}`, { method: 'DELETE' });
+
+        if (isVirtual) {
+            virtualInterviewers = virtualInterviewers.filter(i => i.id !== interviewerId);
+        } else {
+            physicalInterviewers = physicalInterviewers.filter(i => i.id !== interviewerId);
+        }
+
+        renderInterviewers();
+
+    } catch (err) {
+        showError('Failed to remove interviewer: ' + err.message);
+    }
+}
+
+
+// =============================================================================
 // Flexible UI Logic
+// =============================================================================
+
 function toggleFlexibleBreaks() {
     const isFlexible = document.getElementById('breaks-flexible').checked;
     const maxContainer = document.getElementById('breaks-max-container');
@@ -312,25 +649,23 @@ function updateVirtualGuarantee() {
     }
 }
 
+
+// =============================================================================
 // Stats & Capacity Logic
+// =============================================================================
+
 function updateStats() {
     const totalStudents = students.length;
     const totalDemand = students.reduce((sum, s) => sum + s.target, 0);
     const totalInterviewers = physicalInterviewers.length + virtualInterviewers.length;
     const numSlots = parseInt(document.getElementById('num-slots').value) || 13;
 
-    // Calculate breaks - if flexible, use average for capacity estimation
     const breaksMin = parseInt(document.getElementById('breaks-min').value) || 1;
     const isFlexible = document.getElementById('breaks-flexible').checked;
     let breaksMax = breaksMin;
-    let effectiveBreaks = breaksMin;
 
     if (isFlexible) {
         breaksMax = parseInt(document.getElementById('breaks-max').value) || 1;
-        // Conservative estimate: use max breaks for capacity to avoid over-promising
-        // Or user average? Let's use MIN breaks for "Available Slots" to show potential MAXIMUM capacity
-        // But maybe show a range? Let's stick to simple for now: use Min breaks to show best case.
-        effectiveBreaks = breaksMin;
     }
 
     const capacityMin = totalInterviewers * (numSlots - breaksMax);
@@ -356,9 +691,6 @@ function updateStats() {
         });
 
         let maxFreq = 0;
-        // Reset modeTarget if we have actual data to derive it from
-        // However, if we initialize modeTarget to default, we might stick to it if no clear mode?
-        // Let's iterate and find the best mode.
 
         Object.entries(counts).forEach(([target, freq]) => {
             const t = parseInt(target);
@@ -366,12 +698,10 @@ function updateStats() {
                 maxFreq = freq;
                 modeTarget = t;
             } else if (freq === maxFreq) {
-                // Tie-breaker: prefer the current default if it's one of the winners
                 const currentDefault = parseInt(document.getElementById('default-target').value) || 6;
                 if (t === currentDefault) {
                     modeTarget = t;
                 } else if (modeTarget !== currentDefault && t > modeTarget) {
-                    // Otherwise prefer higher number
                     modeTarget = t;
                 }
             }
@@ -384,12 +714,9 @@ function updateStats() {
         modeTextEl.innerHTML = `${modeTarget} ${suffix}`;
     }
 
-
     // Detailed Capacity Summary
     const summaryEl = document.getElementById('capacity-summary');
 
-    // For logic, use the MAX capacity to be optimistic/permissive, or MIN to be safe?
-    // Using Min breaks (Max capacity) allows the solver to try its best.
     const optimisticDiff = capacityMax - totalDemand;
     const pessimisticDiff = capacityMin - totalDemand;
 
@@ -427,13 +754,21 @@ async function runAutoBalance(deficit) {
     }
 }
 
+
+// =============================================================================
 // Generate Schedule
+// =============================================================================
+
 async function generateSchedule(autoBalance = false) {
+    if (!currentEventId) {
+        showMessage('No Event Selected', 'Please select or create an event first.', 'warning');
+        return;
+    }
+
     const btn = document.getElementById('generate-btn');
     const loading = document.getElementById('loading-overlay');
     const errorEl = document.getElementById('error-message');
 
-    // Check basic validity
     const totalStudents = students.length;
     if (totalStudents === 0) {
         showMessage('Missing Information', 'Please add at least one student.', 'warning');
@@ -451,35 +786,30 @@ async function generateSchedule(autoBalance = false) {
 
     // Build request
     const interviewers = [
-        ...physicalInterviewers.map(name => ({ name, is_virtual: false })),
-        ...virtualInterviewers.map(name => ({ name, is_virtual: true }))
+        ...physicalInterviewers.map(i => ({ name: i.name, is_virtual: false })),
+        ...virtualInterviewers.map(i => ({ name: i.name, is_virtual: true }))
     ];
 
     const seedInput = document.getElementById('seed').value;
     const seed = seedInput ? parseInt(seedInput) : null;
 
-    // Parse breaks
     const breaksMin = parseInt(document.getElementById('breaks-min').value) || 1;
     let breaksMax = breaksMin;
     if (document.getElementById('breaks-flexible').checked) {
         breaksMax = parseInt(document.getElementById('breaks-max').value) || breaksMin;
     }
-
-    // Ensure logical constraint
     if (breaksMax < breaksMin) breaksMax = breaksMin;
 
-    // Parse virtual interviews
     const minVirtual = parseInt(document.getElementById('min-virtual').value) || 1;
     let maxVirtual = minVirtual;
     if (document.getElementById('virtual-flexible').checked) {
         maxVirtual = parseInt(document.getElementById('max-virtual').value) || minVirtual;
     }
-
-    // Ensure logical constraint
     if (maxVirtual < minVirtual) maxVirtual = minVirtual;
 
     const payload = {
-        students,
+        event_id: currentEventId,
+        students: students.map(s => ({ name: s.name, target: s.target })),
         interviewers,
         num_slots: parseInt(document.getElementById('num-slots').value) || 13,
         breaks_min: breaksMin,
@@ -544,13 +874,10 @@ function displaySchedule(result) {
     const statsContainer = document.getElementById('results-stats');
     const headerEl = document.getElementById('schedule-header');
     const bodyEl = document.getElementById('schedule-body');
-
-    // New Assignments Table Elements
     const assignmentsBody = document.getElementById('assignments-body');
 
     const numSlots = parseInt(document.getElementById('num-slots').value) || 13;
     const schedule = result.schedule;
-    const stats = result.stats;
     const invAssignments = result.interviewer_assignments || [];
 
     // Create lookup for Name -> ID if needed
@@ -571,14 +898,13 @@ function displaySchedule(result) {
         </tr>
     `;
 
-    const virtualNames = new Set(virtualInterviewers);
+    const virtualNames = new Set(virtualInterviewers.map(i => i.name));
     bodyEl.innerHTML = Object.entries(schedule).map(([name, slots]) => {
         const total = slots.filter(s => s).length;
         const cells = slots.map(s => {
             if (!s) return '<td class="wait">Break</td>';
             const isVirtual = virtualNames.has(s);
 
-            // Determine display text based on viewMode
             let displayText = escapeHtml(s);
             if (viewMode === 'id' && nameToId[s]) {
                 displayText = escapeHtml(nameToId[s]);
@@ -607,7 +933,6 @@ function displaySchedule(result) {
 
     // Render Assignments Table
     if (invAssignments.length > 0) {
-        // Update header to include Total Interviews
         const assignmentsHeader = document.querySelector('#assignments-table thead tr');
         if (assignmentsHeader) {
             assignmentsHeader.innerHTML = `
@@ -665,7 +990,7 @@ async function exportCSV() {
             body: JSON.stringify({
                 schedule: currentSchedule,
                 num_slots: numSlots,
-                virtual_interviewers: virtualInterviewers,
+                virtual_interviewers: virtualInterviewers.map(i => i.name),
                 format: 'xlsx'
             })
         });
@@ -674,7 +999,12 @@ async function exportCSV() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'Fall 2025 Mock Interview Rotation Schedule.xlsx';
+
+        // Use event name for filename if available
+        const filename = currentEvent ?
+            `${currentEvent.name.replace(/[^a-z0-9]/gi, '_')}_Schedule.xlsx` :
+            'Interview_Schedule.xlsx';
+        a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
     } catch (err) {
@@ -682,7 +1012,11 @@ async function exportCSV() {
     }
 }
 
+
+// =============================================================================
 // Utilities
+// =============================================================================
+
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -690,7 +1024,11 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+
+// =============================================================================
 // Modal Controller
+// =============================================================================
+
 const Modal = {
     el: document.getElementById('message-modal'),
     title: document.getElementById('modal-title'),
@@ -766,7 +1104,6 @@ function showPrompt(title, message) {
         document.getElementById('modal-cancel-btn').onclick = () => finish(null);
         document.getElementById('modal-ok-btn').onclick = () => finish(Modal.input.value);
 
-        // Enter key to submit
         Modal.input.onkeydown = (e) => {
             if (e.key === 'Enter') finish(Modal.input.value);
             if (e.key === 'Escape') finish(null);

@@ -1098,3 +1098,117 @@ body {
         column-count: 1;
     }
 }
+
+/* Event Selector */
+.event-selector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.event-selector select {
+    flex: 1;
+    max-width: 400px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.event-selector select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(255, 184, 28, 0.4);
+}
+
+.event-selector .btn {
+    white-space: nowrap;
+}
+
+/* No Event Message / Empty State */
+.no-event-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+}
+
+.empty-state {
+    text-align: center;
+    max-width: 500px;
+    background: var(--bg-white);
+    padding: 48px 40px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow);
+}
+
+.empty-state h2 {
+    font-size: 22px;
+    color: var(--baylor-green);
+    margin-bottom: 12px;
+}
+
+.empty-state p {
+    color: var(--text-secondary);
+    font-size: 15px;
+    margin-bottom: 24px;
+    line-height: 1.6;
+}
+
+/* Form Groups for Modal */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-section);
+    color: var(--text-primary);
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--baylor-green);
+    background: white;
+}
+
+/* Danger Button */
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+/* Modal Actions with delete button */
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.modal-actions .btn-danger {
+    margin-right: auto;
+}
