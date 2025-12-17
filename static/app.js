@@ -11,7 +11,8 @@ let currentSchedule = null;
 let lastSeedUsed = null;
 let lastResult = null;
 let viewMode = 'name';
-let studentSortMode = 'last';
+let studentSortMode = 'alpha';
+let nameSortField = 'last';
 
 // Initialize
 function initializeApp(defaultStudents, defaultPhysical, defaultVirtual) {
@@ -70,9 +71,9 @@ function renderStudents() {
                 <div class="student-group">
                     <div class="group-header">
                         <span class="header-title">${target} Interviews</span>
-                        <span class="count-badge">${groupStudents.length}</span>
+                        <span class="count-badge">${groupStudents.length} student${groupStudents.length !== 1 ? 's' : ''}</span>
                     </div>
-                    <div class="group-content">
+                    <div class="group-content vertical-columns">
                         ${groupStudents.map(s => renderStudentItem(s.originalIndex, s.name, s.target)).join('')}
                     </div>
                 </div>
@@ -83,8 +84,8 @@ function renderStudents() {
     } else {
         // Create a copy with original indices to sort
         const indexedStudents = students.map((s, i) => ({ ...s, originalIndex: i }));
-        // Sort by first or last name
-        if (studentSortMode === 'first') {
+        // Sort by first or last name based on dropdown
+        if (nameSortField === 'first') {
             indexedStudents.sort((a, b) => getFirstName(a.name).localeCompare(getFirstName(b.name)));
         } else {
             indexedStudents.sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)));
@@ -117,6 +118,19 @@ function updateStudentSort() {
             break;
         }
     }
+
+    // Get name sort field from dropdown
+    const nameSortSelect = document.getElementById('name-sort-field');
+    if (nameSortSelect) {
+        nameSortField = nameSortSelect.value;
+    }
+
+    // Show/hide dropdown based on mode
+    const dropdown = document.getElementById('name-sort-dropdown');
+    if (dropdown) {
+        dropdown.style.display = studentSortMode === 'alpha' ? 'flex' : 'none';
+    }
+
     renderStudents();
 }
 
